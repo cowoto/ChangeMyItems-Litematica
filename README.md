@@ -1,86 +1,144 @@
 # Litematica Material Swap
 
-Client-seitiger Fabric-Mod für Minecraft 26.3, der Litematica erweitert: In der Material List
-einer Schematic kann ein Material durch ein anderes ersetzt werden (im Speicher, mit Undo,
-optional als neue `.litematic` speicherbar).
+Client-Mod für Fabric (Minecraft 26.3), der [Litematica](https://github.com/sakura-ryoko/litematica) erweitert:
+Materialien einer geladenen Schematic direkt aus der **Material List** austauschen – einzeln, gefiltert, nur in einem
+Teilbereich oder als Batch. Hologramm, Verifier und Easy Place arbeiten danach mit dem neuen Material.
 
-## Voraussetzungen
+> Version 0.1.0 – siehe [CHANGELOG.md](CHANGELOG.md).
 
-| | Version |
-|---|---|
-| Minecraft | 26.3 |
-| Java (JDK) | 25 |
-| Fabric Loader | ≥ 0.19.5 |
-| Fabric API | ≥ 0.161.0+26.3 |
-| MaLiLib | 0.30.x (≥ 0.30.2) |
-| Litematica | 0.29.x (≥ 0.29.1) |
+![Übersicht](docs/screenshots/overview.png)
+<!-- TODO Screenshot: Material List mit den Buttons „Ersetzen“, „Batch-Ersetzung“, „Rückgängig“, „Als neue Schematic speichern“ -->
 
-Gradle sucht das JDK 25 über die Toolchain automatisch. Wird es nicht gefunden, den Pfad
-in `~/.gradle/gradle.properties` eintragen:
+## Funktionen
 
-```properties
-org.gradle.java.installations.paths=C:/Program Files/Java/jdk-25.0.4.1
-```
+- **Ersetzen aus der Material List** – Button „Ersetzen“ in jeder Zeile, Zielblock aus einer durchsuchbaren Liste.
+- **Properties bleiben erhalten** – Slab oben/unten/doppelt, waterlogged, Treppen-Ausrichtung usw. werden übernommen.
+- **Teilbereiche** – ganze Schematic, ausgewählte Regionen oder nur innerhalb deiner Litematica-Bereichsauswahl
+  (Rotation, Spiegelung und Sub-Regionen des Placements werden berücksichtigt).
+- **Filter und feste Properties** – z. B. nur obere Slabs ersetzen, oder bei allen ersetzten Blöcken `waterlogged=false`.
+- **Batch-Ersetzung** – mehrere Materialien in einem Durchgang, mit Vorschau, Ketten-Erkennung und Material-Delta.
+- **Rückgängig** – auch ein ganzer Batch ist ein Schritt.
+- **Als neue Schematic speichern** – `<name>_swapped.litematic`, das Original bleibt unangetastet.
+- **Regeln merken** – global oder pro Schematic, optional beim Laden automatisch anwenden; Batches als Regelsätze.
+- **Konfiguration** im gewohnten MaLiLib-Stil, Deutsch und Englisch.
 
-## Bauen
+## Installation
 
-```sh
-./gradlew build
-```
+Benötigt (alle in den `mods`-Ordner, Fabric-Profil):
 
-Die fertige JAR liegt in `build/libs/litematica-material-swap-mc26.3-<version>.jar`.
-MaLiLib und Litematica werden nicht mit eingebündelt und müssen separat installiert sein.
+| Mod | Version | Quelle |
+|---|---|---|
+| Minecraft | 26.3 | |
+| [Fabric Loader](https://fabricmc.net/use/) | ≥ 0.19.5 | fabricmc.net |
+| [Fabric API](https://modrinth.com/mod/fabric-api) | ≥ 0.161.0+26.3 | Modrinth |
+| [MaLiLib](https://modrinth.com/mod/malilib) | 0.30.x, ≥ 0.30.2 | Modrinth |
+| [Litematica](https://modrinth.com/mod/litematica) | 0.29.x, ≥ 0.29.1 | Modrinth |
+| Litematica Material Swap | 0.1.0 | `litematica-material-swap-mc26.3-0.1.0.jar` |
 
-## Im Dev-Client starten
+Optional: [Mod Menu](https://modrinth.com/mod/modmenu) für den Config-Eintrag in der Mod-Liste.
 
-```sh
-./gradlew runClient
-```
-
-Startet Minecraft mit Fabric API, MaLiLib, Litematica und diesem Mod.
+Fehlt eine Abhängigkeit oder passt die Version nicht, zeigt Fabric beim Start eine Fehlermeldung mit der benötigten
+Version. Der Mod läuft nur auf dem Client; auf Servern muss nichts installiert werden.
 
 ## Bedienung
 
-Alles läuft über Litematicas **Material List** (eines Placements oder einer geladenen Schematic).
+### Ein Material ersetzen
 
-**Ersetzen** (Button in jeder Zeile) öffnet „Material ersetzen“:
-- Zielblock in der durchsuchbaren Liste wählen („Luft“ entfernt das Material).
-- „Block-Properties übernehmen“: an = nur Blöcke mit gleichen Properties (Slab → Slab, Treppe → Treppe),
-  aus = alle Blöcke, das Ziel bekommt seine Standardwerte.
-- **Bereich** (rechts oben): ganze Schematic, ausgewählte Regionen oder die aktuelle Litematica-Bereichsauswahl
-  (nur in der Material List eines Placements; Rotation/Spiegelung werden berücksichtigt).
-- **▸ Filter**: nur Blöcke mit bestimmten Property-Werten ersetzen, z. B. nur `type: top`; jeder Wert zeigt seine Anzahl.
-- **▸ Ziel-Properties fest setzen**: Properties, die jeder ersetzte Block bekommt, z. B. `waterlogged: false`.
-- Vorschau mit Anzahl und Warnungen; optional als Regel für diese Schematic oder global merken.
+1. Litematica-Menü (**M**) → Placement → **Material List** (oder Hotkey **M,L**).
+2. In der Zeile des Materials auf **Ersetzen** klicken.
+3. Zielblock wählen (Suche nach Name oder ID). „Luft“ entfernt das Material.
+4. Optional:
+   - **Block-Properties übernehmen** (an: nur Blöcke mit gleichen Properties wie Slab → Slab; aus: alle Blöcke,
+     Standard-Properties),
+   - **Bereich** rechts: ganze Schematic, ausgewählte Regionen oder aktuelle Bereichsauswahl,
+   - **▸ Filter**: nur bestimmte Property-Werte (mit Anzahl je Wert),
+   - **▸ Ziel-Properties fest setzen**,
+   - als Regel für diese Schematic oder global merken.
+5. Vorschau prüfen („N Blöcke werden ersetzt“ + Warnungen) → **Ersetzen**.
 
-**Batch-Ersetzung** (unten in der Material List): mehrere Regeln auf einmal, in Reihenfolge („erste passende Regel
-gewinnt“). Regeln hinzufügen (Quelle wählen → wie oben), mit ↑ ↓ bzw. Shift+↑/↓ sortieren, bearbeiten, löschen;
-gespeicherte Regeln als Vorlage übernehmen; als Regelsatz speichern und wieder laden. Gemeinsamer Bereich für den Batch,
-pro Regel überschreibbar. Ketten (A → B, B → C) werden erkannt; Modus „nur Originalzustand“ (Standard) oder
-„nacheinander anwenden“. Vorschau mit Treffern je Regel und Material-Delta. Ein Batch ist **ein** Rückgängig-Schritt.
+![Material ersetzen](docs/screenshots/replace.png)
+<!-- TODO Screenshot: Ersetzen-Screen mit gewähltem Ziel, aufgeklapptem Filter und Bereichs-Umschalter -->
 
-**Letzte Ersetzung rückgängig** und **Als neue Schematic speichern** (`<name>_swapped`, Original wird nur nach
-ausdrücklicher Bestätigung überschrieben). Ohne Speichern gelten Ersetzungen nur bis zum Neuladen der Schematic.
+### Batch-Ersetzung
 
-## Konfiguration
+1. Material List → **Batch-Ersetzung**.
+2. **+ Regel hinzufügen**: Quellmaterial wählen, dann wie oben einstellen → **Übernehmen**. Gespeicherte Regeln lassen
+   sich rechts per „+“ übernehmen, Regelsätze laden.
+3. Reihenfolge mit ↑ ↓ oder **Shift+↑/↓** – die erste passende Regel gewinnt.
+4. Rechts: gemeinsamer **Batch-Bereich** und Ketten-Modus (**nur Originalzustand** = Standard, oder **nacheinander
+   anwenden**).
+5. Vorschau unten: Treffer je Regel, Warnungen (Ketten, überlappende Filter), Änderung der Material List →
+   **Ausführen**.
 
-- Config-Seite: Hotkey **M,W**, über MaLiLibs Config-Umschalter oder Mod Menu.
-- `config/lmswap.json` – Optionen (z. B. „Gespeicherte Regeln beim Laden anwenden“, Standard aus).
-- `config/lmswap_rules.json` – gespeicherte Regeln (global, pro Schematic-Datei) und Regelsätze, Format-Version 2.
-  Eine Version-1-Datei wird beim ersten Start automatisch migriert (Sicherung: `lmswap_rules.v1.bak.json`).
-- Beim automatischen Anwenden werden Regeln mit Bereich „Bereichsauswahl“ übersprungen (Hinweis im Spiel).
+![Batch-Ersetzung](docs/screenshots/batch.png)
+<!-- TODO Screenshot: Batch-Screen mit drei Regeln, Vorschau und Kettenwarnung -->
 
-## Tests
+### Rückgängig und Speichern
 
-`./gradlew build` führt 68 Unit-Tests aus (`fabric-loader-junit`, Minecraft wird im Test gebootstrapt). Fälle und
-Ergebnisse, auch die nur im Spiel prüfbaren: [docs/TESTS.md](docs/TESTS.md).
+- **Letzte Ersetzung rückgängig** (Material List) stellt den Zustand vor der letzten Ersetzung bzw. dem letzten Batch
+  exakt wieder her (bis zu 20 Schritte pro Schematic).
+- **Als neue Schematic speichern** schreibt `<name>_swapped.litematic` neben das Original. Das Original wird nur nach
+  ausdrücklicher Bestätigung überschrieben.
+- Ohne Speichern gelten Ersetzungen nur bis zum Neuladen der Schematic.
 
-## Dokumentation
+![Rückgängig und Speichern](docs/screenshots/undo-save.png)
+<!-- TODO Screenshot: Material List nach einer Ersetzung, Tooltip von „Letzte Ersetzung rückgängig“ -->
 
-- [docs/RESEARCH.md](docs/RESEARCH.md) – Versionen, Litematica-Klassen, Einbindung
-- [docs/DECISIONS.md](docs/DECISIONS.md) – Entscheidungen und offene Punkte
-- [docs/TESTS.md](docs/TESTS.md) – Randfälle, Testfälle, manuelle Prüfschritte
+### Konfiguration
+
+Hotkey **M,W**, MaLiLibs Config-Umschalter (z. B. aus Litematicas Config **M,C**) oder Mod Menu.
+
+| Option | Standard | Bedeutung |
+|---|---|---|
+| Gespeicherte Regeln beim Laden anwenden | aus | Beim Laden/Neuladen einer Schematic ihre Regeln und die globalen Regeln anwenden |
+| Konfiguration öffnen | M,W | Hotkey für diese Seite |
+
+Dateien: `config/lmswap.json` (Optionen), `config/lmswap_rules.json` (Regeln und Regelsätze; ältere Dateien werden
+automatisch migriert, Sicherung `lmswap_rules.v1.bak.json`).
+
+## Bekannte Einschränkungen
+
+- **Litematica 0.29.x und MaLiLib 0.30.x** – der Mod greift per Mixin in Litematica ein; andere Versionen lehnt Fabric
+  beim Start ab.
+- **Material-List-Einträge sind Items**, nicht Block-States. „Nur diesen State ersetzen“ geht über den Filter im
+  Ersetzen-Screen.
+- **Strenge Property-Prüfung** bei „Properties übernehmen“: Slab → Vollblock oder Fackel/Wandfackel nur mit
+  ausgeschalteter Übernahme.
+- **Ersetzungen betreffen die Schematic**, nicht nur ein Placement – nutzen mehrere Placements dieselbe Schematic,
+  ändern sich alle (es wird gewarnt).
+- **Bereichsauswahl** nur in der Material List eines Placements; Filter/Overrides beziehen sich auf die
+  Schematic-Ausrichtung (z. B. `facing`), nicht auf das gedrehte Placement.
+- **Material List aus dem Dateibrowser** („Load Schematics“ → „Material List“), Bereichsanalyse und Custom-Listen:
+  kein Ersetzen (dort gibt es keine geladene Schematic).
+- **Rückgängig** geht verloren beim Entladen oder „Reload“ der Schematic; Änderungen mit Litematicas eigenem
+  Edit-Modus zwischen Ersetzen und Rückgängig werden überschrieben.
+- **Regeln sind an den Dateipfad gebunden** – nach Umbenennen/Verschieben gelten nur noch globale Regeln.
+- **Batch:** höchstens 63 Regeln; kein Drag & Drop (Pfeile bzw. Shift+↑/↓). Sehr große Batches (Millionen Blöcke)
+  verursachen einen kurzen Hänger.
+- Getestet im Dev-Client; siehe [docs/TESTS.md](docs/TESTS.md) für den Stand der manuellen Prüfungen.
 
 ## Lizenz
 
-LGPL-3.0
+Litematica Material Swap steht unter der **GNU Lesser General Public License v3.0** ([LICENSE](LICENSE), auf Basis
+der GPL v3: [COPYING](COPYING)).
+
+Der Mod ist ein eigenständiges Add-on und **enthält keinen Code aus Litematica oder MaLiLib**. Beide werden zur
+Laufzeit benötigt, aber nicht mitgeliefert; sie stehen selbst unter der LGPL-3.0 (© masa, sakura-ryoko und
+Mitwirkende) und müssen separat installiert werden. Litematica und MaLiLib sind nicht mit diesem Projekt verbunden.
+
+## Entwicklung
+
+Voraussetzung: JDK 25. Gradle findet es über die Toolchain; sonst in `~/.gradle/gradle.properties`
+`org.gradle.java.installations.paths=<Pfad zum JDK 25>` eintragen.
+
+```sh
+./gradlew build      # baut und führt 68 Unit-Tests aus -> build/libs/litematica-material-swap-mc26.3-0.1.0.jar
+./gradlew runClient  # Dev-Client mit Fabric API, MaLiLib, Litematica und diesem Mod
+```
+
+Jeder Push baut über GitHub Actions ([.github/workflows/build.yml](.github/workflows/build.yml)); die JAR liegt als
+Artefakt am Workflow-Lauf.
+
+Dokumentation: [docs/RESEARCH.md](docs/RESEARCH.md) (Versionen, Litematica-Klassen),
+[docs/DECISIONS.md](docs/DECISIONS.md) (Entscheidungen), [docs/TESTS.md](docs/TESTS.md) (Testfälle),
+[docs/ROADMAP.md](docs/ROADMAP.md) (Ideen für 0.2).

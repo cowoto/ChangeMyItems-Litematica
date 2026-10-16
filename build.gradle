@@ -79,6 +79,12 @@ java {
 	withSourcesJar()
 }
 
+jar {
+	// LGPL-3.0 text and the GPL-3.0 it builds on
+	from('LICENSE') { rename { "LICENSE_${project.archives_base_name}" } }
+	from('COPYING') { rename { "COPYING_${project.archives_base_name}" } }
+}
+
 tasks.withType(JavaCompile).configureEach {
 	it.options.encoding = 'UTF-8'
 	it.options.release = 25
