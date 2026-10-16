@@ -6,5 +6,11 @@
 	"lmswap.error.properties_differ": "%s and %s do not have the same block properties, replacement not possible",
 	"lmswap.warning.properties_dropped": "%s: properties not transferred: %s",
 	"lmswap.warning.block_entities_removed": "Removed %s block entity data entries in region '%s' (target has no block entity)",
-	"lmswap.warning.block_entities_kept": "Kept %s block entity data entries in region '%s' (data may not fit the new block)"
+	"lmswap.warning.block_entities_kept": "Kept %s block entity data entries in region '%s' (data may not fit the new block)",
+	"lmswap.error.no_world": "No world loaded",
+	"lmswap.error.no_placement_selected": "No schematic placement selected",
+	"lmswap.warning.shared_schematic": "Warning: %s placements share this schematic, the replacement affects all of them",
+	"lmswap.debug.confirm_hint": "Run %s to replace anyway",
+	"lmswap.info.replaced_total": "Replaced %s blocks in '%s'",
+	"lmswap.info.replaced_region": "  Region '%s': %s"
 }

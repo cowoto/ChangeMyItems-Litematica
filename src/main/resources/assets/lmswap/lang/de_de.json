@@ -6,5 +6,11 @@
 	"lmswap.error.properties_differ": "%s und %s haben nicht dieselben Block-Eigenschaften, Ersetzen nicht möglich",
 	"lmswap.warning.properties_dropped": "%s: Eigenschaften nicht übernommen: %s",
 	"lmswap.warning.block_entities_removed": "%s Block-Entity-Daten in Region '%s' entfernt (Zielblock hat keine Block-Entity)",
-	"lmswap.warning.block_entities_kept": "%s Block-Entity-Daten in Region '%s' behalten (Daten passen evtl. nicht zum neuen Block)"
+	"lmswap.warning.block_entities_kept": "%s Block-Entity-Daten in Region '%s' behalten (Daten passen evtl. nicht zum neuen Block)",
+	"lmswap.error.no_world": "Keine Welt geladen",
+	"lmswap.error.no_placement_selected": "Kein Schematic-Placement ausgewählt",
+	"lmswap.warning.shared_schematic": "Achtung: %s Placements nutzen diese Schematic, die Ersetzung wirkt auf alle",
+	"lmswap.debug.confirm_hint": "Mit %s trotzdem ersetzen",
+	"lmswap.info.replaced_total": "%s Blöcke in '%s' ersetzt",
+	"lmswap.info.replaced_region": "  Region '%s': %s"
 }
