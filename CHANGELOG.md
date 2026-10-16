@@ -2,7 +2,7 @@
 
 Format nach [Keep a Changelog](https://keepachangelog.com/de/1.1.0/), Versionen nach [SemVer](https://semver.org/lang/de/).
 
-## [0.1.0] – 2026-10-16
+## [1.0.0] – 2026-10-16
 
 Erste Version. Minecraft 26.3, Fabric Loader ≥ 0.19.5, Fabric API ≥ 0.161.0+26.3, MaLiLib 0.30.x (≥ 0.30.2),
 Litematica 0.29.x (≥ 0.29.1). Nur Client.
@@ -30,4 +30,5 @@ Litematica 0.29.x (≥ 0.29.1). Nur Client.
 - Ersetzung im Speicher der geladenen Schematic; Datei wird nur über „Speichern als“ geschrieben.
 - 68 Unit-Tests (`fabric-loader-junit`), u. a. Weltkoordinaten-Umrechnung für alle Rotationen/Spiegelungen,
   Mixin-Anwendung auf Litematica, Vollständigkeit der Sprachdateien.
-- GitHub-Actions-Workflow baut bei jedem Push und legt die JAR als Artefakt ab.
+- GitHub Actions: Build bei jedem Push (JAR als Artefakt); beim Veröffentlichen eines Releases wird die JAR
+  mit der Version aus dem Tag gebaut und ans Release gehängt.

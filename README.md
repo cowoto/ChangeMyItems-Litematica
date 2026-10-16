@@ -4,7 +4,7 @@ Client-Mod für Fabric (Minecraft 26.3), der [Litematica](https://github.com/sak
 Materialien einer geladenen Schematic direkt aus der **Material List** austauschen – einzeln, gefiltert, nur in einem
 Teilbereich oder als Batch. Hologramm, Verifier und Easy Place arbeiten danach mit dem neuen Material.
 
-> Version 0.1.0 – siehe [CHANGELOG.md](CHANGELOG.md).
+> Version 1.0.0 – siehe [CHANGELOG.md](CHANGELOG.md).
 
 ## Funktionen
 
@@ -30,7 +30,7 @@ Benötigt (alle in den `mods`-Ordner, Fabric-Profil):
 | [Fabric API](https://modrinth.com/mod/fabric-api) | ≥ 0.161.0+26.3 | Modrinth |
 | [MaLiLib](https://modrinth.com/mod/malilib) | 0.30.x, ≥ 0.30.2 | Modrinth |
 | [Litematica](https://modrinth.com/mod/litematica) | 0.29.x, ≥ 0.29.1 | Modrinth |
-| Litematica Material Swap | 0.1.0 | `litematica-material-swap-mc26.3-0.1.0.jar` |
+| Litematica Material Swap | 1.0.0 | `litematica-material-swap-mc26.3-1.0.0.jar` aus den [Releases](https://github.com/cowoto/ChangeMyItems-Litematica/releases) |
 
 Optional: [Mod Menu](https://modrinth.com/mod/modmenu) für den Config-Eintrag in der Mod-Liste.
 
@@ -106,7 +106,7 @@ automatisch migriert, Sicherung `lmswap_rules.v1.bak.json`).
 - **Regeln sind an den Dateipfad gebunden** – nach Umbenennen/Verschieben gelten nur noch globale Regeln.
 - **Batch:** höchstens 63 Regeln; kein Drag & Drop (Pfeile bzw. Shift+↑/↓). Sehr große Batches (Millionen Blöcke)
   verursachen einen kurzen Hänger.
-- Version 0.1.0 ist im Dev-Client entwickelt und per Unit-Tests geprüft; Rückmeldungen über die Issues sind willkommen.
+- Version 1.0.0 ist im Dev-Client entwickelt und per Unit-Tests geprüft; Rückmeldungen über die Issues sind willkommen.
 
 ## Lizenz
 
@@ -123,9 +123,10 @@ Voraussetzung: JDK 25. Gradle findet es über die Toolchain; sonst in `~/.gradle
 `org.gradle.java.installations.paths=<Pfad zum JDK 25>` eintragen.
 
 ```sh
-./gradlew build      # baut und führt 68 Unit-Tests aus -> build/libs/litematica-material-swap-mc26.3-0.1.0.jar
+./gradlew build      # baut und führt 68 Unit-Tests aus -> build/libs/litematica-material-swap-mc26.3-1.0.0.jar
 ./gradlew runClient  # Dev-Client mit Fabric API, MaLiLib, Litematica und diesem Mod
 ```
 
-Jeder Push baut über GitHub Actions ([.github/workflows/build.yml](.github/workflows/build.yml)); die JAR liegt als
-Artefakt am Workflow-Lauf.
+Jeder Push baut über GitHub Actions ([build.yml](.github/workflows/build.yml)); die JAR liegt als Artefakt am
+Workflow-Lauf. Beim Veröffentlichen eines Releases baut [release.yml](.github/workflows/release.yml) die JAR mit der
+Version aus dem Tag (`v1.2.3` → 1.2.3) und hängt sie samt SHA-256 ans Release.
