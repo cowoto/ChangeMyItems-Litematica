@@ -3,6 +3,8 @@ package de.nils.lmswap.core;
 import java.util.List;
 import java.util.Optional;
 
+import javax.annotation.Nullable;
+
 import fi.dy.masa.litematica.data.DataManager;
 import fi.dy.masa.litematica.schematic.LitematicaSchematic;
 import fi.dy.masa.litematica.schematic.placement.SchematicPlacement;
@@ -38,12 +40,22 @@ public final class MaterialSwapService
     public static ReplacementResult replaceInSchematic(LitematicaSchematic schematic, List<ReplacementRule> rules,
                                                        String sourceName, String targetName)
     {
+        return replaceInSchematic(schematic, rules, null, sourceName, targetName);
+    }
+
+    /**
+     * @param placement needed for rules with a world box scope (area selection), may be null otherwise
+     */
+    public static ReplacementResult replaceInSchematic(LitematicaSchematic schematic, List<ReplacementRule> rules,
+                                                       @Nullable SchematicPlacement placement,
+                                                       String sourceName, String targetName)
+    {
         if (Minecraft.getInstance().level == null)
         {
             return ReplacementResult.rejected(Message.of("lmswap.error.no_world"));
         }
 
-        ReplacementResult result = SchematicReplacer.apply(schematic, rules);
+        ReplacementResult result = SchematicReplacer.apply(schematic, rules, placement);
 
         if (result.change() != null)
         {

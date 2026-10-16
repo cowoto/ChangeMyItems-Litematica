@@ -80,6 +80,15 @@ public final class SchematicReplacer
             return ReplacementResult.rejected(Message.of("lmswap.error.scope_unresolvable"));
         }
 
+        return applyResolved(schematic, rules, scopes);
+    }
+
+    /**
+     * Like {@link #apply(LitematicaSchematic, List, SchematicPlacement)} with the scopes already converted to region
+     * coordinates (one per rule). Rules are assumed to be checked.
+     */
+    static ReplacementResult applyResolved(LitematicaSchematic schematic, List<ReplacementRule> rules, ResolvedScope[] scopes)
+    {
         Map<String, Integer> replacedPerRegion = new LinkedHashMap<>();
         Set<Message> warnings = new LinkedHashSet<>();
         List<RegionChange> regionChanges = new ArrayList<>();

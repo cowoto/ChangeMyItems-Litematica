@@ -72,5 +72,15 @@
 	"lmswap.error.override_unknown_property": "Fixed target property '%s' does not exist on %s",
 	"lmswap.error.override_invalid_value": "Fixed target property '%s' has no value '%s' on %s",
 	"lmswap.error.scope_unresolvable": "The area can not be converted to schematic coordinates (no placement)",
-	"lmswap.warning.rules_selection_skipped": "%s saved rule(s) with scope 'area selection' were not applied to '%s' - the selection is not reliably available when loading"
+	"lmswap.warning.rules_selection_skipped": "%s saved rule(s) with scope 'area selection' were not applied to '%s' - the selection is not reliably available when loading",
+	"lmswap.gui.label.scope_title": "Area",
+	"lmswap.gui.button.scope.whole": "Whole schematic",
+	"lmswap.gui.button.scope.regions": "Selected regions",
+	"lmswap.gui.button.scope.selection": "Current area selection",
+	"lmswap.gui.button.scope.selection.hover": "Only blocks inside the boxes of your current Litematica area selection",
+	"lmswap.gui.scope.selection_unavailable.no_placement": "Only available in the material list of a placement (world coordinates need a placement)",
+	"lmswap.gui.scope.selection_unavailable.no_selection": "There is no area selection with a complete box",
+	"lmswap.gui.scope.selection_unavailable.no_intersection": "The area selection does not intersect this placement",
+	"lmswap.gui.label.scope_empty": "No blocks of this material in the chosen area",
+	"lmswap.warning.selection_shared": "%s placements use this schematic: the corresponding blocks change in all of them"
 }

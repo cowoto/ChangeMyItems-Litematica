@@ -2,7 +2,10 @@ package de.nils.lmswap.gui;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import javax.annotation.Nullable;
 
@@ -28,6 +31,11 @@ import de.nils.lmswap.config.Configs;
 import de.nils.lmswap.core.ItemReplacementPlan;
 import de.nils.lmswap.core.MaterialSwapService;
 import de.nils.lmswap.core.ReplacementResult;
+import de.nils.lmswap.core.ReplacementRule;
+import de.nils.lmswap.core.SchematicReplacer;
+import de.nils.lmswap.core.Scope;
+import de.nils.lmswap.core.SelectionScopes;
+import de.nils.lmswap.data.SavedScope;
 import de.nils.lmswap.data.RuleStore;
 import de.nils.lmswap.data.SavedRule;
 
@@ -53,6 +61,29 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
     private boolean rememberGlobal;
     @Nullable private Block selected;
 
+    /** Part B: where to replace */
+    private ScopeMode scopeMode = ScopeMode.WHOLE;
+    private final List<String> regionNames;
+    private final Set<String> selectedRegions;
+    private SelectionScopes.Availability selectionAvailability;
+    @Nullable private Scope.WorldBoxes selectionBoxes;
+    /** Blocks the replacement would hit in the current scope */
+    private int scopedCount;
+
+    private enum ScopeMode
+    {
+        WHOLE("lmswap.gui.button.scope.whole"),
+        REGIONS("lmswap.gui.button.scope.regions"),
+        SELECTION("lmswap.gui.button.scope.selection");
+
+        final String translationKey;
+
+        ScopeMode(String translationKey)
+        {
+            this.translationKey = translationKey;
+        }
+    }
+
     public GuiMaterialReplace(ReplaceContext context, MaterialListEntry entry)
     {
         super(10, LIST_Y);
@@ -64,6 +95,78 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         this.title = StringUtils.translate("lmswap.gui.title.replace_material");
         this.useTitleHierarchy = false;
         this.collectTargets();
+
+        this.regionNames = new ArrayList<>(context.schematic().getAreas().keySet());
+        this.regionNames.sort(String.CASE_INSENSITIVE_ORDER);
+        this.selectedRegions = new LinkedHashSet<>(this.regionNames);
+        this.refreshSelection();
+        this.updateCount();
+    }
+
+    private void refreshSelection()
+    {
+        this.selectionAvailability = SelectionScopes.check(this.context.placement());
+        this.selectionBoxes = this.selectionAvailability == SelectionScopes.Availability.AVAILABLE
+                              ? SelectionScopes.currentSelection().orElse(null) : null;
+
+        if (this.scopeMode == ScopeMode.SELECTION && this.selectionBoxes == null)
+        {
+            this.scopeMode = ScopeMode.WHOLE;
+        }
+    }
+
+    private Scope currentScope()
+    {
+        return switch (this.scopeMode)
+        {
+            case WHOLE -> Scope.WHOLE;
+            case REGIONS -> new Scope.Regions(this.selectedRegions);
+            case SELECTION -> this.selectionBoxes != null ? this.selectionBoxes : Scope.WHOLE;
+        };
+    }
+
+    private SavedScope currentSavedScope()
+    {
+        return switch (this.scopeMode)
+        {
+            case WHOLE -> SavedScope.ALL;
+            case REGIONS -> SavedScope.regions(new ArrayList<>(this.selectedRegions));
+            case SELECTION -> SavedScope.SELECTION;
+        };
+    }
+
+    private List<ReplacementRule> currentRules(@Nullable Block target)
+    {
+        return this.plan.rulesFor(target, this.keepProperties, List.of(), Map.of(), this.currentScope());
+    }
+
+    private void updateCount()
+    {
+        int count = SchematicReplacer.countMatching(this.context.schematic(), this.currentRules(null), this.context.placement());
+        this.scopedCount = Math.max(0, count);
+    }
+
+    private void setScopeMode(ScopeMode mode)
+    {
+        this.scopeMode = mode;
+        this.refreshSelection();
+        this.updateCount();
+        this.initGui();
+    }
+
+    private void toggleRegion(String region, boolean checked)
+    {
+        if (checked)
+        {
+            this.selectedRegions.add(region);
+        }
+        else
+        {
+            this.selectedRegions.remove(region);
+        }
+
+        this.updateCount();
+        this.initGui();
     }
 
     /**
@@ -107,6 +210,7 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
             list.refreshEntries();
         }
 
+        this.updateCount();
         this.initGui();
     }
 
@@ -175,14 +279,15 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         rememberGlobal.setListener(cb -> this.rememberGlobal = cb.isChecked());
         this.addWidget(rememberGlobal);
 
-        this.createRulesPanel();
+        int panelY = this.createScopePanel();
+        this.createRulesPanel(panelY);
 
         int buttonY = this.getScreenHeight() - 26;
         ButtonGeneric cancel = new ButtonGeneric(this.getScreenWidth() - 10, buttonY, -1, true, "lmswap.gui.button.cancel");
         this.addButton(cancel, (button, mouseButton) -> this.closeGui(true));
 
         ButtonGeneric replace = new ButtonGeneric(cancel.getX() - 4, buttonY, -1, true, "lmswap.gui.button.replace_confirm");
-        replace.setEnabled(this.selected != null && this.plan.getBlockCount() > 0);
+        replace.setEnabled(this.selected != null && this.scopedCount > 0);
         this.addButton(replace, (button, mouseButton) -> this.replace());
 
         // Decision 4: replacements live only in memory until saved as a new schematic
@@ -192,12 +297,75 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
     }
 
     /**
-     * Saved rules of this schematic and the global rules, each with a delete button.
+     * Part B: "Whole schematic | Selected regions | Current area selection", plus the region check boxes.
+     *
+     * @return the y position below the panel
      */
-    private void createRulesPanel()
+    private int createScopePanel()
     {
         int panelX = 10 + this.getBrowserWidth() + 8;
+        int width = RULES_PANEL_WIDTH;
         int y = LIST_Y + 4;
+
+        this.addLabel(panelX, y, width, 10, 0xFFFFFFFF, GuiBase.TXT_BOLD + StringUtils.translate("lmswap.gui.label.scope_title"));
+        y += 12;
+
+        for (ScopeMode mode : ScopeMode.values())
+        {
+            boolean active = mode == this.scopeMode;
+            String label = (active ? "» " : "") + StringUtils.translate(mode.translationKey);
+            ButtonGeneric button = new ButtonGeneric(panelX, y, width, 16, label);
+            button.setEnabled(active == false);
+
+            if (mode == ScopeMode.SELECTION && this.selectionAvailability != SelectionScopes.Availability.AVAILABLE)
+            {
+                button.setEnabled(false);
+                button.setHoverStrings("lmswap.gui.scope.selection_unavailable." + this.selectionAvailability.name().toLowerCase(java.util.Locale.ROOT));
+            }
+            else if (mode == ScopeMode.SELECTION)
+            {
+                button.setHoverStrings("lmswap.gui.button.scope.selection.hover");
+            }
+
+            this.addButton(button, (btn, mouseButton) -> this.setScopeMode(mode));
+            y += 17;
+        }
+
+        if (this.scopeMode == ScopeMode.REGIONS)
+        {
+            int maxRows = 6;
+            int shown = 0;
+
+            for (String region : this.regionNames)
+            {
+                if (shown == maxRows)
+                {
+                    this.addLabel(panelX + 4, y, width, 10, 0xFFA0A0A0,
+                                  StringUtils.translate("lmswap.gui.label.rules_more", this.regionNames.size() - shown));
+                    y += 12;
+                    break;
+                }
+
+                String label = StringUtils.clampTextToRenderLength(region, width - 20, LeftRight.RIGHT, "...");
+                WidgetCheckBox box = new WidgetCheckBox(panelX + 4, y, Icons.CHECKBOX_UNSELECTED, Icons.CHECKBOX_SELECTED, label);
+                box.setChecked(this.selectedRegions.contains(region), false);
+                box.setListener(cb -> this.toggleRegion(region, cb.isChecked()));
+                this.addWidget(box);
+                y += 12;
+                ++shown;
+            }
+        }
+
+        return y + 8;
+    }
+
+    /**
+     * Saved rules of this schematic and the global rules, each with a delete button.
+     */
+    private void createRulesPanel(int startY)
+    {
+        int panelX = 10 + this.getBrowserWidth() + 8;
+        int y = startY;
         int width = RULES_PANEL_WIDTH;
         int maxY = LIST_Y + this.getBrowserHeight() - RULE_ROW_HEIGHT;
 
@@ -266,7 +434,8 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
             return;
         }
 
-        SavedRule rule = SavedRule.of(this.entry.getStack().getItem(), this.selected, this.keepProperties);
+        SavedRule rule = SavedRule.of(this.entry.getStack().getItem(), this.selected, this.keepProperties)
+                                  .withFilter(List.of(), Map.of(), this.currentSavedScope());
 
         if (this.rememberForSchematic)
         {
@@ -317,18 +486,31 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
             return;
         }
 
+        if (this.scopedCount == 0)
+        {
+            this.drawString(ctx, GuiBase.TXT_RED + StringUtils.translate("lmswap.gui.label.scope_empty"), x, y, 0xFFFFFFFF);
+            return;
+        }
+
         if (this.selected == null)
         {
             this.drawString(ctx, GuiBase.TXT_GRAY + StringUtils.translate("lmswap.gui.label.select_target"), x, y, 0xFFFFFFFF);
             return;
         }
 
-        String preview = StringUtils.translate("lmswap.gui.label.preview", this.plan.getBlockCount(),
+        String preview = StringUtils.translate("lmswap.gui.label.preview", this.scopedCount,
                                                this.entry.getStack().getHoverName().getString(),
                                                WidgetReplaceTargetEntry.displayName(this.selected));
         this.drawString(ctx, preview, x, y, 0xFFFFFFFF);
 
-        for (ReplacementResult.Message warning : this.plan.previewWarnings(this.selected, this.keepProperties))
+        List<ReplacementResult.Message> warnings = new ArrayList<>(this.plan.previewWarnings(this.selected, this.keepProperties));
+
+        if (this.scopeMode == ScopeMode.SELECTION && this.placementCount > 1)
+        {
+            warnings.add(ReplacementResult.Message.of("lmswap.warning.selection_shared", this.placementCount));
+        }
+
+        for (ReplacementResult.Message warning : warnings)
         {
             y += 11;
             this.drawString(ctx, GuiBase.TXT_GOLD + StringUtils.translate(warning.translationKey(), warning.args().toArray()),
@@ -350,7 +532,8 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         }
 
         ReplacementResult result = MaterialSwapService.replaceInSchematic(this.context.schematic(),
-                                                                          this.plan.rulesFor(this.selected, this.keepProperties),
+                                                                          this.currentRules(this.selected),
+                                                                          this.context.placement(),
                                                                           this.entry.getStack().getHoverName().getString(),
                                                                           WidgetReplaceTargetEntry.displayName(this.selected));
         Screen parent = this.getParent();

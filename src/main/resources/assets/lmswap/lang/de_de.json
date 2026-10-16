@@ -72,5 +72,15 @@
 	"lmswap.error.override_unknown_property": "Fest gesetzte Ziel-Property '%s' gibt es bei %s nicht",
 	"lmswap.error.override_invalid_value": "Fest gesetzte Ziel-Property '%1$s' hat bei %3$s keinen Wert '%2$s'",
 	"lmswap.error.scope_unresolvable": "Der Bereich lässt sich nicht in Schematic-Koordinaten umrechnen (kein Placement)",
-	"lmswap.warning.rules_selection_skipped": "%s gespeicherte Regel(n) mit Bereich 'Bereichsauswahl' wurden nicht auf '%s' angewendet – die Auswahl ist beim Laden nicht zuverlässig vorhanden"
+	"lmswap.warning.rules_selection_skipped": "%s gespeicherte Regel(n) mit Bereich 'Bereichsauswahl' wurden nicht auf '%s' angewendet – die Auswahl ist beim Laden nicht zuverlässig vorhanden",
+	"lmswap.gui.label.scope_title": "Bereich",
+	"lmswap.gui.button.scope.whole": "Ganze Schematic",
+	"lmswap.gui.button.scope.regions": "Ausgewählte Regionen",
+	"lmswap.gui.button.scope.selection": "Aktuelle Bereichsauswahl",
+	"lmswap.gui.button.scope.selection.hover": "Nur Blöcke innerhalb der Boxen deiner aktuellen Litematica-Bereichsauswahl",
+	"lmswap.gui.scope.selection_unavailable.no_placement": "Nur in der Material List eines Placements verfügbar (Weltkoordinaten brauchen ein Placement)",
+	"lmswap.gui.scope.selection_unavailable.no_selection": "Es gibt keine Bereichsauswahl mit vollständiger Box",
+	"lmswap.gui.scope.selection_unavailable.no_intersection": "Die Bereichsauswahl schneidet dieses Placement nicht",
+	"lmswap.gui.label.scope_empty": "Im gewählten Bereich gibt es keine Blöcke dieses Materials",
+	"lmswap.warning.selection_shared": "%s Placements nutzen diese Schematic: die entsprechenden Blöcke ändern sich in allen"
 }

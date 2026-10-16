@@ -31,6 +31,12 @@ public final class ResolvedScope
         return this.regions == null;
     }
 
+    /** True if no region is affected at all */
+    boolean isEmptyMap()
+    {
+        return this.regions != null && this.regions.isEmpty();
+    }
+
     /**
      * @return null if the region is not affected at all
      */
