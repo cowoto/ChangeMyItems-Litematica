@@ -27,22 +27,27 @@ public final class SavedRuleApplier
     /**
      * @param appliedRules number of rules that changed something
      * @param blocks       total replaced blocks
-     * @param skipped      rules that could not be applied (unknown ids, strict property check)
+     * @param skipped      rules that could not be applied (unknown ids, invalid filter/override, strict property check)
+     * @param skippedSelection rules with scope "area selection", which is not reliably available when loading
      */
-    public record Summary(int appliedRules, int blocks, int skipped)
+    public record Summary(int appliedRules, int blocks, int skipped, int skippedSelection)
     {
     }
 
-    /** The rules that apply to this schematic, in application order */
+    /**
+     * The rules that apply to this schematic, in application order: first its own rules, then the global rules. A
+     * global rule is left out only if a schematic rule has the same source, filter and scope. Otherwise both run:
+     * e.g. "top slabs -> X" for this schematic and "all slabs -> Y" globally; the remaining slabs become Y.
+     */
     public static List<SavedRule> effectiveRules(LitematicaSchematic schematic)
     {
         List<SavedRule> rules = new ArrayList<>(RuleStore.INSTANCE.getSchematicRules(schematic));
-        Set<String> covered = new HashSet<>();
-        rules.forEach(rule -> covered.add(rule.sourceItem()));
+        Set<List<Object>> covered = new HashSet<>();
+        rules.forEach(rule -> covered.add(key(rule)));
 
         for (SavedRule rule : RuleStore.INSTANCE.getGlobalRules())
         {
-            if (covered.contains(rule.sourceItem()) == false)
+            if (covered.contains(key(rule)) == false)
             {
                 rules.add(rule);
             }
@@ -51,14 +56,28 @@ public final class SavedRuleApplier
         return rules;
     }
 
+    private static List<Object> key(SavedRule rule)
+    {
+        return List.of(rule.sourceItem(), rule.conditions(), rule.scope());
+    }
+
     public static Summary apply(LitematicaSchematic schematic)
     {
         int applied = 0;
         int blocks = 0;
         int skipped = 0;
+        int skippedSelection = 0;
 
         for (SavedRule rule : effectiveRules(schematic))
         {
+            Optional<Scope> scope = rule.scope().toScope();
+
+            if (scope.isEmpty())
+            {
+                ++skippedSelection;
+                continue;
+            }
+
             Optional<Item> source = rule.resolveSource();
             Optional<Block> target = rule.resolveTarget();
 
@@ -69,6 +88,12 @@ public final class SavedRuleApplier
             }
 
             ItemReplacementPlan plan = ItemReplacementPlan.forItem(schematic, source.get());
+
+            if (plan.isEmpty() == false && plan.validateConditions(rule.propertyConditions()) != null)
+            {
+                ++skipped;
+                continue;
+            }
 
             // Source == target (e.g. a rule edited by hand): nothing to do, not an error
             if (plan.isEmpty() || plan.getSourceBlocks().contains(target.get()))
@@ -89,9 +114,15 @@ public final class SavedRuleApplier
                 continue;
             }
 
-            ReplacementResult result = MaterialSwapService.replaceInSchematic(schematic,
-                                                                              plan.rulesFor(target.get(), rule.keepProperties()),
-                                                                              rule.sourceName(), rule.targetName());
+            List<ReplacementRule> rules = plan.rulesFor(target.get(), rule.keepProperties(), rule.propertyConditions(),
+                                                        rule.overrides(), scope.get());
+
+            if (rules.isEmpty())
+            {
+                continue;
+            }
+
+            ReplacementResult result = MaterialSwapService.replaceInSchematic(schematic, rules, rule.sourceName(), rule.targetName());
 
             if (result.isSuccess() && result.totalReplaced() > 0)
             {
@@ -104,6 +135,6 @@ public final class SavedRuleApplier
             }
         }
 
-        return new Summary(applied, blocks, skipped);
+        return new Summary(applied, blocks, skipped, skippedSelection);
     }
 }

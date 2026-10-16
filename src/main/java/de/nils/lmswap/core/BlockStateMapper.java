@@ -4,6 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.properties.Property;
@@ -56,6 +57,11 @@ public final class BlockStateMapper
     public static boolean haveSameProperties(Block a, Block b)
     {
         return a.getStateDefinition().getProperties().equals(b.getStateDefinition().getProperties());
+    }
+
+    public static String blockId(Block block)
+    {
+        return BuiltInRegistries.BLOCK.getKey(block).toString();
     }
 
     private static <S extends Comparable<S>, T extends Comparable<T>> Optional<BlockState> copyValue(

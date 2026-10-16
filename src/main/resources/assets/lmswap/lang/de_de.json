@@ -65,5 +65,12 @@
 	"lmswap.info.rules_auto_applied": "%s gespeicherte Regel(n) (%s Blöcke) auf '%s' angewendet",
 	"lmswap.warning.rules_skipped": "%s gespeicherte Regel(n) konnten nicht auf '%s' angewendet werden (unbekannter Block/Item oder andere Properties)",
 	"lmswap.warning.water_lost": "Wassergeflutete Blöcke verlieren ihr Wasser (Zielblock kann nicht geflutet sein)",
-	"lmswap.error.schematic_not_loaded": "Die Schematic bzw. das Placement dieser Material List ist nicht mehr geladen"
+	"lmswap.error.schematic_not_loaded": "Die Schematic bzw. das Placement dieser Material List ist nicht mehr geladen",
+	"lmswap.error.filter_unknown_property": "Filter: Property '%s' gibt es bei %s nicht",
+	"lmswap.error.filter_no_values": "Filter: kein Wert für '%s' gewählt",
+	"lmswap.error.filter_invalid_value": "Filter: '%1$s' hat bei %3$s keinen Wert '%2$s'",
+	"lmswap.error.override_unknown_property": "Fest gesetzte Ziel-Property '%s' gibt es bei %s nicht",
+	"lmswap.error.override_invalid_value": "Fest gesetzte Ziel-Property '%1$s' hat bei %3$s keinen Wert '%2$s'",
+	"lmswap.error.scope_unresolvable": "Der Bereich lässt sich nicht in Schematic-Koordinaten umrechnen (kein Placement)",
+	"lmswap.warning.rules_selection_skipped": "%s gespeicherte Regel(n) mit Bereich 'Bereichsauswahl' wurden nicht auf '%s' angewendet – die Auswahl ist beim Laden nicht zuverlässig vorhanden"
 }

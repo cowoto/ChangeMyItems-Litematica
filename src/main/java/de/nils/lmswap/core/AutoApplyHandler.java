@@ -68,6 +68,12 @@ public final class AutoApplyHandler
                                                  summary.blocks(), schematic.getMetadata().getName());
             }
 
+            if (summary.skippedSelection() > 0)
+            {
+                InfoUtils.showGuiOrInGameMessage(MessageType.WARNING, "lmswap.warning.rules_selection_skipped",
+                                                 summary.skippedSelection(), schematic.getMetadata().getName());
+            }
+
             if (summary.skipped() > 0)
             {
                 InfoUtils.showGuiOrInGameMessage(MessageType.WARNING, "lmswap.warning.rules_skipped", summary.skipped(),

@@ -65,5 +65,12 @@
 	"lmswap.info.rules_auto_applied": "Applied %s saved rule(s) (%s blocks) to '%s'",
 	"lmswap.warning.rules_skipped": "%s saved rule(s) could not be applied to '%s' (unknown block/item or different properties)",
 	"lmswap.warning.water_lost": "Waterlogged blocks lose their water (the target can not be waterlogged)",
-	"lmswap.error.schematic_not_loaded": "The schematic or placement of this material list is no longer loaded"
+	"lmswap.error.schematic_not_loaded": "The schematic or placement of this material list is no longer loaded",
+	"lmswap.error.filter_unknown_property": "Filter: property '%s' does not exist on %s",
+	"lmswap.error.filter_no_values": "Filter: no value selected for '%s'",
+	"lmswap.error.filter_invalid_value": "Filter: '%s' has no value '%s' on %s",
+	"lmswap.error.override_unknown_property": "Fixed target property '%s' does not exist on %s",
+	"lmswap.error.override_invalid_value": "Fixed target property '%s' has no value '%s' on %s",
+	"lmswap.error.scope_unresolvable": "The area can not be converted to schematic coordinates (no placement)",
+	"lmswap.warning.rules_selection_skipped": "%s saved rule(s) with scope 'area selection' were not applied to '%s' - the selection is not reliably available when loading"
 }

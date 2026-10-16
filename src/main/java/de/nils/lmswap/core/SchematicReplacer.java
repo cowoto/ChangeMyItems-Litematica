@@ -18,23 +18,26 @@ import fi.dy.masa.litematica.schematic.SchematicMetadata;
 import fi.dy.masa.litematica.schematic.container.ILitematicaBlockStatePalette;
 import fi.dy.masa.litematica.schematic.container.LitematicaBitArray;
 import fi.dy.masa.litematica.schematic.container.LitematicaBlockStateContainer;
+import fi.dy.masa.litematica.schematic.placement.SchematicPlacement;
 import fi.dy.masa.malilib.util.data.tag.CompoundData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Vec3i;
-import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.ticks.ScheduledTick;
 
 import de.nils.lmswap.core.ReplacementResult.Message;
+import de.nils.lmswap.core.ResolvedScope.RegionPart;
 import de.nils.lmswap.core.SchematicChange.RegionChange;
 
 /**
  * Replaces blocks in all regions of a loaded schematic, in memory only.
  * <p>
- * Strategy (see docs/DECISIONS.md): the palette is used to find out which palette ids match the rule and to
- * pre-register the target states; the storage is then scanned once comparing raw ids. The palette itself is
- * never rewritten, so each changed position is known (needed for undo and block entities).
+ * Strategy (see docs/DECISIONS.md): the palette is used to find out which palette ids match which rules (state part:
+ * block and property conditions) and to pre-register the target states; the storage is then scanned once comparing
+ * raw ids. Rules with a scope additionally check the position. For each position the first matching rule in list
+ * order wins, so every position is replaced at most once per pass. The palette itself is never rewritten, so each
+ * changed position is known (needed for undo and block entities).
  * <p>
  * Does not trigger a re-render; callers must mark the placements for rebuild.
  */
@@ -46,22 +49,35 @@ public final class SchematicReplacer
 
     public static ReplacementResult apply(LitematicaSchematic schematic, ReplacementRule rule)
     {
-        return apply(schematic, List.of(rule));
+        return apply(schematic, List.of(rule), null);
+    }
+
+    public static ReplacementResult apply(LitematicaSchematic schematic, List<ReplacementRule> rules)
+    {
+        return apply(schematic, rules, null);
     }
 
     /**
-     * Applies several rules in one pass, e.g. one per block state behind a material list entry.
-     * For each state the first matching rule wins. The result holds a single undo record.
+     * Applies several rules in one pass. For each position the first matching rule wins. The result holds a single
+     * undo record.
+     *
+     * @param placement needed to resolve {@link Scope.WorldBoxes} scopes, may be null otherwise
      */
-    public static ReplacementResult apply(LitematicaSchematic schematic, List<ReplacementRule> rules)
+    public static ReplacementResult apply(LitematicaSchematic schematic, List<ReplacementRule> rules,
+                                          @Nullable SchematicPlacement placement)
     {
-        for (ReplacementRule rule : rules)
+        Message error = check(rules);
+
+        if (error != null)
         {
-            if (rule.isPropertyCompatible() == false)
-            {
-                return ReplacementResult.rejected(Message.of("lmswap.error.properties_differ",
-                                                             blockId(rule.sourceBlock()), blockId(rule.target())));
-            }
+            return ReplacementResult.rejected(error);
+        }
+
+        ResolvedScope[] scopes = resolveScopes(schematic, rules, placement);
+
+        if (scopes == null)
+        {
+            return ReplacementResult.rejected(Message.of("lmswap.error.scope_unresolvable"));
         }
 
         Map<String, Integer> replacedPerRegion = new LinkedHashMap<>();
@@ -72,20 +88,22 @@ public final class SchematicReplacer
         for (String regionName : schematic.getAreas().keySet())
         {
             LitematicaBlockStateContainer container = schematic.getSubRegionContainer(regionName);
+            RegionPart[] parts = partsFor(scopes, regionName);
 
-            if (container == null)
+            if (container == null || parts == null)
             {
                 continue;
             }
 
             Map<BlockPos, CompoundData> blockEntities = schematic.getBlockEntityMapForRegion(regionName);
             Map<BlockPos, ScheduledTick<Block>> blockTicks = schematic.getScheduledBlockTicksForRegion(regionName);
+            Compiled compiled = Compiled.of(container, rules, parts, warnings);
 
             // Positions with extra data that are about to be replaced; usually a tiny set compared to the volume
-            List<BlockPos> blockEntityCandidates = matchingPositions(container, blockEntities, rules);
-            List<BlockPos> blockTickCandidates = matchingPositions(container, blockTicks, rules);
+            List<BlockPos> blockEntityCandidates = compiled.matchingPositions(container, blockEntities);
+            List<BlockPos> blockTickCandidates = compiled.matchingPositions(container, blockTicks);
 
-            ContainerChange change = replaceInContainer(container, rules, warnings);
+            ContainerChange change = replace(container, compiled);
 
             if (change.count() == 0)
             {
@@ -144,12 +162,16 @@ public final class SchematicReplacer
     }
 
     /**
-     * Restores the state from before the replacement described by {@code change}.
+     * Restores the state from before the replacement described by {@code change}. Region changes are reverted in
+     * reverse order, so a change made of several passes over the same positions is undone correctly.
      */
     public static void revert(LitematicaSchematic schematic, SchematicChange change)
     {
-        for (RegionChange region : change.regions())
+        List<RegionChange> regions = change.regions();
+
+        for (int i = regions.size() - 1; i >= 0; --i)
         {
+            RegionChange region = regions.get(i);
             LitematicaBlockStateContainer container = schematic.getSubRegionContainer(region.regionName());
 
             if (container == null)
@@ -177,19 +199,35 @@ public final class SchematicReplacer
     }
 
     /**
-     * Counts the blocks in all regions that one of the rules would replace.
+     * Counts the blocks in all regions that the rules would replace.
      */
     public static int countMatching(LitematicaSchematic schematic, List<ReplacementRule> rules)
     {
+        return countMatching(schematic, rules, null);
+    }
+
+    /**
+     * @return the number of blocks the rules would replace, or -1 if a scope can not be resolved
+     */
+    public static int countMatching(LitematicaSchematic schematic, List<ReplacementRule> rules, @Nullable SchematicPlacement placement)
+    {
+        ResolvedScope[] scopes = resolveScopes(schematic, rules, placement);
+
+        if (scopes == null)
+        {
+            return -1;
+        }
+
         int count = 0;
 
         for (String regionName : schematic.getAreas().keySet())
         {
             LitematicaBlockStateContainer container = schematic.getSubRegionContainer(regionName);
+            RegionPart[] parts = partsFor(scopes, regionName);
 
-            if (container != null)
+            if (container != null && parts != null)
             {
-                count += countMatching(container, rules);
+                count += count(container, Compiled.of(container, rules, parts, null));
             }
         }
 
@@ -198,43 +236,7 @@ public final class SchematicReplacer
 
     static int countMatching(LitematicaBlockStateContainer container, List<ReplacementRule> rules)
     {
-        ILitematicaBlockStatePalette palette = container.getPalette();
-        final int paletteSize = palette.getPaletteSize();
-        boolean[] matches = new boolean[paletteSize];
-        boolean anyMatch = false;
-
-        for (int id = 0; id < paletteSize; ++id)
-        {
-            BlockState state = palette.getBlockState(id);
-
-            if (state != null && ruleFor(rules, state) != null)
-            {
-                matches[id] = true;
-                anyMatch = true;
-            }
-        }
-
-        if (anyMatch == false)
-        {
-            return 0;
-        }
-
-        LitematicaBitArray storage = container.getArray();
-        Vec3i size = container.getSize();
-        final long volume = (long) size.getX() * size.getY() * size.getZ();
-        int count = 0;
-
-        for (long index = 0; index < volume; ++index)
-        {
-            int id = storage.getAt(index);
-
-            if (id < paletteSize && matches[id])
-            {
-                ++count;
-            }
-        }
-
-        return count;
+        return count(container, Compiled.of(container, rules, wholeParts(rules.size()), null));
     }
 
     static ContainerChange replaceInContainer(LitematicaBlockStateContainer container, ReplacementRule rule, Set<Message> warnings)
@@ -244,84 +246,7 @@ public final class SchematicReplacer
 
     static ContainerChange replaceInContainer(LitematicaBlockStateContainer container, List<ReplacementRule> rules, Set<Message> warnings)
     {
-        ILitematicaBlockStatePalette palette = container.getPalette();
-        final int paletteSize = palette.getPaletteSize();
-        BlockState[] oldStates = new BlockState[paletteSize];
-        BlockState[] newStates = new BlockState[paletteSize];
-        boolean anyMatch = false;
-
-        for (int id = 0; id < paletteSize; ++id)
-        {
-            BlockState state = palette.getBlockState(id);
-            ReplacementRule rule = state != null ? ruleFor(rules, state) : null;
-
-            if (rule != null)
-            {
-                BlockStateMapper.MappingResult mapped = rule.map(state);
-
-                if (mapped.state() != state)
-                {
-                    oldStates[id] = state;
-                    newStates[id] = mapped.state();
-                    anyMatch = true;
-
-                    if (mapped.isComplete() == false)
-                    {
-                        warnings.add(Message.of("lmswap.warning.properties_dropped",
-                                                state, String.join(", ", mapped.droppedProperties())));
-                    }
-                }
-            }
-        }
-
-        if (anyMatch == false)
-        {
-            return ContainerChange.EMPTY;
-        }
-
-        // Registering new states may resize the palette and replace the storage. Existing ids stay stable
-        // (Litematica's resize copies raw ids), so look up the new ids only after all states are registered.
-        for (BlockState state : newStates)
-        {
-            if (state != null)
-            {
-                container.getPalette().idFor(state);
-            }
-        }
-
-        int[] newIds = new int[paletteSize];
-
-        for (int id = 0; id < paletteSize; ++id)
-        {
-            newIds[id] = newStates[id] != null ? container.getPalette().idFor(newStates[id]) : -1;
-        }
-
-        LitematicaBitArray storage = container.getArray();
-        Vec3i size = container.getSize();
-        final long volume = (long) size.getX() * size.getY() * size.getZ();
-        Map<BlockState, IntArrayList> changed = new Object2ObjectOpenHashMap<>();
-
-        if (volume > Integer.MAX_VALUE)
-        {
-            throw new IllegalStateException("Region too large for undo indices: " + volume);
-        }
-        int count = 0;
-        int totalBlocksDelta = 0;
-
-        for (long index = 0; index < volume; ++index)
-        {
-            int id = storage.getAt(index);
-
-            if (id < paletteSize && newIds[id] >= 0)
-            {
-                storage.setAt(index, newIds[id]);
-                changed.computeIfAbsent(oldStates[id], k -> new IntArrayList()).add((int) index);
-                ++count;
-                totalBlocksDelta += airDelta(oldStates[id], newStates[id]);
-            }
-        }
-
-        return new ContainerChange(count, totalBlocksDelta, changed);
+        return replace(container, Compiled.of(container, rules, wholeParts(rules.size()), warnings));
     }
 
     static void revertContainer(LitematicaBlockStateContainer container, Map<BlockState, IntArrayList> oldStates)
@@ -346,36 +271,175 @@ public final class SchematicReplacer
         }
     }
 
-    private static <T> List<BlockPos> matchingPositions(LitematicaBlockStateContainer container, Map<BlockPos, T> map, List<ReplacementRule> rules)
-    {
-        List<BlockPos> list = new ArrayList<>();
-
-        if (map != null)
-        {
-            for (BlockPos pos : map.keySet())
-            {
-                if (ruleFor(rules, container.get(pos.getX(), pos.getY(), pos.getZ())) != null)
-                {
-                    list.add(pos);
-                }
-            }
-        }
-
-        return list;
-    }
-
     @Nullable
-    private static ReplacementRule ruleFor(List<ReplacementRule> rules, BlockState state)
+    private static Message check(List<ReplacementRule> rules)
     {
         for (ReplacementRule rule : rules)
         {
-            if (rule.matches(state))
+            List<Message> errors = rule.validate();
+
+            if (errors.isEmpty() == false)
             {
-                return rule;
+                return errors.getFirst();
+            }
+
+            if (rule.isPropertyCompatible() == false)
+            {
+                return Message.of("lmswap.error.properties_differ",
+                                  BlockStateMapper.blockId(rule.sourceBlock()), BlockStateMapper.blockId(rule.target()));
             }
         }
 
         return null;
+    }
+
+    @Nullable
+    private static ResolvedScope[] resolveScopes(LitematicaSchematic schematic, List<ReplacementRule> rules,
+                                                 @Nullable SchematicPlacement placement)
+    {
+        ResolvedScope[] scopes = new ResolvedScope[rules.size()];
+
+        for (int i = 0; i < scopes.length; ++i)
+        {
+            scopes[i] = ScopeResolver.resolve(rules.get(i).scope(), schematic, placement);
+
+            if (scopes[i] == null)
+            {
+                return null;
+            }
+        }
+
+        return scopes;
+    }
+
+    /**
+     * @return per rule its part of this region (null entries = rule inactive here), or null if no rule touches it
+     */
+    @Nullable
+    private static RegionPart[] partsFor(ResolvedScope[] scopes, String regionName)
+    {
+        RegionPart[] parts = new RegionPart[scopes.length];
+        boolean any = false;
+
+        for (int i = 0; i < scopes.length; ++i)
+        {
+            parts[i] = scopes[i].forRegion(regionName);
+            any |= parts[i] != null;
+        }
+
+        return any ? parts : null;
+    }
+
+    private static RegionPart[] wholeParts(int count)
+    {
+        RegionPart[] parts = new RegionPart[count];
+        java.util.Arrays.fill(parts, RegionPart.WHOLE);
+        return parts;
+    }
+
+    private static int count(LitematicaBlockStateContainer container, Compiled compiled)
+    {
+        if (compiled.anyMatch == false)
+        {
+            return 0;
+        }
+
+        LitematicaBitArray storage = container.getArray();
+        Vec3i size = container.getSize();
+        int count = 0;
+        long index = 0;
+
+        for (int y = 0; y < size.getY(); ++y)
+        {
+            for (int z = 0; z < size.getZ(); ++z)
+            {
+                for (int x = 0; x < size.getX(); ++x, ++index)
+                {
+                    if (compiled.candidateAt(storage.getAt(index), x, y, z) >= 0)
+                    {
+                        ++count;
+                    }
+                }
+            }
+        }
+
+        return count;
+    }
+
+    private static ContainerChange replace(LitematicaBlockStateContainer container, Compiled compiled)
+    {
+        if (compiled.anyMatch == false)
+        {
+            return ContainerChange.EMPTY;
+        }
+
+        // Registering new states may resize the palette and replace the storage. Existing ids stay stable
+        // (Litematica's resize copies raw ids), so look up the new ids only after all states are registered.
+        for (BlockState[] states : compiled.newStates)
+        {
+            if (states != null)
+            {
+                for (BlockState state : states)
+                {
+                    container.getPalette().idFor(state);
+                }
+            }
+        }
+
+        int[][] newIds = new int[compiled.paletteSize][];
+
+        for (int id = 0; id < compiled.paletteSize; ++id)
+        {
+            BlockState[] states = compiled.newStates[id];
+
+            if (states != null)
+            {
+                newIds[id] = new int[states.length];
+
+                for (int k = 0; k < states.length; ++k)
+                {
+                    newIds[id][k] = container.getPalette().idFor(states[k]);
+                }
+            }
+        }
+
+        LitematicaBitArray storage = container.getArray();
+        Vec3i size = container.getSize();
+        final long volume = (long) size.getX() * size.getY() * size.getZ();
+
+        if (volume > Integer.MAX_VALUE)
+        {
+            throw new IllegalStateException("Region too large for undo indices: " + volume);
+        }
+
+        Map<BlockState, IntArrayList> changed = new Object2ObjectOpenHashMap<>();
+        int count = 0;
+        int totalBlocksDelta = 0;
+        int index = 0;
+
+        for (int y = 0; y < size.getY(); ++y)
+        {
+            for (int z = 0; z < size.getZ(); ++z)
+            {
+                for (int x = 0; x < size.getX(); ++x, ++index)
+                {
+                    int id = storage.getAt(index);
+                    int k = compiled.candidateAt(id, x, y, z);
+
+                    if (k >= 0)
+                    {
+                        BlockState oldState = compiled.oldStates[id];
+                        BlockState newState = compiled.newStates[id][k];
+                        storage.setAt(index, newIds[id][k]);
+                        changed.computeIfAbsent(oldState, s -> new IntArrayList()).add(index);
+                        ++count;
+                        totalBlocksDelta += airDelta(oldState, newState);
+                    }
+                }
+            }
+        }
+
+        return new ContainerChange(count, totalBlocksDelta, changed);
     }
 
     private static int airDelta(BlockState oldState, BlockState newState)
@@ -391,9 +455,139 @@ public final class SchematicReplacer
         metadata.setModifiedSinceSaved();
     }
 
-    private static String blockId(Block block)
+    /**
+     * The rules of one pass, prepared for one region container: per palette id the candidate rules (in list order)
+     * whose state part matches, with the mapped target state of each.
+     */
+    private static final class Compiled
     {
-        return BuiltInRegistries.BLOCK.getKey(block).toString();
+        final int paletteSize;
+        final BlockState[] oldStates;
+        /** per palette id: candidate rule parts, null = no candidate */
+        final RegionPart[][] candidateParts;
+        /** per palette id: mapped state per candidate; null entries where mapping gives the same state */
+        final BlockState[][] newStates;
+        final boolean anyMatch;
+
+        private Compiled(int paletteSize, BlockState[] oldStates, RegionPart[][] candidateParts, BlockState[][] newStates, boolean anyMatch)
+        {
+            this.paletteSize = paletteSize;
+            this.oldStates = oldStates;
+            this.candidateParts = candidateParts;
+            this.newStates = newStates;
+            this.anyMatch = anyMatch;
+        }
+
+        static Compiled of(LitematicaBlockStateContainer container, List<ReplacementRule> rules, RegionPart[] parts,
+                           @Nullable Set<Message> warnings)
+        {
+            ILitematicaBlockStatePalette palette = container.getPalette();
+            final int paletteSize = palette.getPaletteSize();
+            BlockState[] oldStates = new BlockState[paletteSize];
+            RegionPart[][] candidateParts = new RegionPart[paletteSize][];
+            BlockState[][] newStates = new BlockState[paletteSize][];
+            boolean anyMatch = false;
+
+            for (int id = 0; id < paletteSize; ++id)
+            {
+                BlockState state = palette.getBlockState(id);
+
+                if (state == null)
+                {
+                    continue;
+                }
+
+                List<RegionPart> candParts = new ArrayList<>(1);
+                List<BlockState> candStates = new ArrayList<>(1);
+
+                for (int r = 0; r < rules.size(); ++r)
+                {
+                    ReplacementRule rule = rules.get(r);
+
+                    if (parts[r] == null || rule.matches(state) == false)
+                    {
+                        continue;
+                    }
+
+                    BlockStateMapper.MappingResult mapped = rule.map(state);
+
+                    // A rule that maps the state to itself still "wins" the position (first match), it just does nothing
+                    candParts.add(parts[r]);
+                    candStates.add(mapped.state());
+
+                    if (warnings != null && mapped.state() != state && mapped.isComplete() == false)
+                    {
+                        warnings.add(Message.of("lmswap.warning.properties_dropped", state, String.join(", ", mapped.droppedProperties())));
+                    }
+
+                    if (parts[r].isWhole())
+                    {
+                        break; // later rules can never win for this id
+                    }
+                }
+
+                if (candParts.isEmpty() == false)
+                {
+                    oldStates[id] = state;
+                    candidateParts[id] = candParts.toArray(new RegionPart[0]);
+                    newStates[id] = candStates.toArray(new BlockState[0]);
+                    anyMatch |= candStates.stream().anyMatch(s -> s != state);
+                }
+            }
+
+            return new Compiled(paletteSize, oldStates, candidateParts, newStates, anyMatch);
+        }
+
+        /**
+         * @return index of the winning candidate for this id and position, -1 if none or if it maps to the same state
+         */
+        int candidateAt(int id, int x, int y, int z)
+        {
+            if (id >= this.paletteSize)
+            {
+                return -1;
+            }
+
+            RegionPart[] parts = this.candidateParts[id];
+
+            if (parts == null)
+            {
+                return -1;
+            }
+
+            for (int k = 0; k < parts.length; ++k)
+            {
+                if (parts[k].contains(x, y, z))
+                {
+                    return this.newStates[id][k] != this.oldStates[id] ? k : -1;
+                }
+            }
+
+            return -1;
+        }
+
+        <T> List<BlockPos> matchingPositions(LitematicaBlockStateContainer container, @Nullable Map<BlockPos, T> map)
+        {
+            List<BlockPos> list = new ArrayList<>();
+
+            if (map != null && this.anyMatch)
+            {
+                LitematicaBitArray storage = container.getArray();
+                Vec3i size = container.getSize();
+
+                for (BlockPos pos : map.keySet())
+                {
+                    long index = ((long) pos.getY() * size.getZ() + pos.getZ()) * size.getX() + pos.getX();
+
+                    if (this.candidateAt(storage.getAt(index), pos.getX(), pos.getY(), pos.getZ()) >= 0)
+                    {
+                        list.add(pos);
+                    }
+                }
+            }
+
+            return list;
+        }
     }
 
     record ContainerChange(int count, int totalBlocksDelta, Map<BlockState, IntArrayList> oldStates)

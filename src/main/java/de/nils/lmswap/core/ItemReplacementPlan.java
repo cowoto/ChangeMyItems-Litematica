@@ -3,6 +3,7 @@ package de.nils.lmswap.core;
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import javax.annotation.Nullable;
@@ -151,15 +152,67 @@ public final class ItemReplacementPlan
      */
     public List<ReplacementRule> rulesFor(@Nullable Block target, boolean keepProperties)
     {
+        return this.rulesFor(target, keepProperties, List.of(), Map.of(), Scope.WHOLE);
+    }
+
+    /**
+     * One rule per source state that passes the conditions. The conditions are evaluated here (a state that lacks a
+     * filtered property does not pass), so the rules themselves are exact-state rules carrying overrides and scope.
+     *
+     * @param target null only for counting (the target is irrelevant for matching)
+     */
+    public List<ReplacementRule> rulesFor(@Nullable Block target, boolean keepProperties, List<PropertyCondition> conditions,
+                                          Map<String, String> overrides, Scope scope)
+    {
         Block t = target != null ? target : Blocks.AIR;
         List<ReplacementRule> rules = new ArrayList<>(this.sourceStates.size());
 
         for (BlockState state : this.sourceStates)
         {
-            rules.add(ReplacementRule.ofState(state, t).withKeepProperties(keepProperties));
+            if (conditions.stream().allMatch(c -> c.matches(state)))
+            {
+                rules.add(ReplacementRule.ofState(state, t).withKeepProperties(keepProperties)
+                                         .withOverrides(target != null ? overrides : Map.of()).withScope(scope));
+            }
         }
 
         return rules;
+    }
+
+    /**
+     * A condition is valid if at least one source block has the property and knows all values (several source
+     * blocks, e.g. torch and wall torch, can have different properties).
+     *
+     * @return the first problem, or null if all conditions are valid
+     */
+    @Nullable
+    public Message validateConditions(List<PropertyCondition> conditions)
+    {
+        for (PropertyCondition condition : conditions)
+        {
+            Message firstError = null;
+            boolean valid = false;
+
+            for (Block block : this.sourceBlocks)
+            {
+                Message error = condition.validate(block);
+
+                if (error == null)
+                {
+                    valid = true;
+                    break;
+                }
+
+                firstError = firstError != null ? firstError : error;
+            }
+
+            if (valid == false && firstError != null)
+            {
+                return firstError;
+            }
+        }
+
+        return null;
     }
 
     /**
