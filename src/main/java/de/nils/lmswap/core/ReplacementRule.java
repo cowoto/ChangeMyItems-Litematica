@@ -67,11 +67,13 @@ public record ReplacementRule(Block sourceBlock, @Nullable BlockState sourceStat
     }
 
     /**
-     * @return false if {@link #requireSameProperties} forbids this rule
+     * @return false if {@link #requireSameProperties} forbids this rule. Without {@link #keepProperties} the target
+     *         gets its default state, so the property sets do not matter.
      */
     public boolean isPropertyCompatible()
     {
         return this.requireSameProperties == false
+               || this.keepProperties == false
                || this.removesMaterial()
                || BlockStateMapper.haveSameProperties(this.sourceBlock, this.target);
     }

@@ -40,7 +40,7 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
     private final ReplaceContext context;
     private final MaterialListEntry entry;
     private final ItemReplacementPlan plan;
-    private final List<Block> targets;
+    private final List<Block> targets = new ArrayList<>();
     private final int placementCount;
     private boolean keepProperties = true;
     @Nullable private Block selected;
@@ -52,28 +52,54 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         this.context = context;
         this.entry = entry;
         this.plan = ItemReplacementPlan.forItem(context.schematic(), entry.getStack().getItem());
-        this.targets = this.collectTargets();
         this.placementCount = context.placements().size();
         this.title = StringUtils.translate("lmswap.gui.title.replace_material");
         this.useTitleHierarchy = false;
+        this.collectTargets();
     }
 
-    private List<Block> collectTargets()
+    /**
+     * Fills {@link #targets} in place; the list widget holds a reference to it.
+     */
+    private void collectTargets()
     {
-        List<Block> list = new ArrayList<>();
+        this.targets.clear();
 
         for (Block block : BuiltInRegistries.BLOCK)
         {
-            if (block.asItem() != Items.AIR && this.plan.isAllowedTarget(block))
+            if (block.asItem() != Items.AIR && this.plan.isAllowedTarget(block, this.keepProperties))
             {
-                list.add(block);
+                this.targets.add(block);
             }
         }
 
-        list.sort(Comparator.comparing(WidgetReplaceTargetEntry::displayName, String.CASE_INSENSITIVE_ORDER));
-        list.addFirst(Blocks.AIR);
+        this.targets.sort(Comparator.comparing(WidgetReplaceTargetEntry::displayName, String.CASE_INSENSITIVE_ORDER));
+        this.targets.addFirst(Blocks.AIR);
+    }
 
-        return list;
+    private void onKeepPropertiesChanged(boolean keepProperties)
+    {
+        this.keepProperties = keepProperties;
+        this.collectTargets();
+
+        WidgetListReplaceTargets list = this.getListWidget();
+
+        if (this.selected != null && this.targets.contains(this.selected) == false)
+        {
+            this.selected = null;
+
+            if (list != null)
+            {
+                list.clearSelection();
+            }
+        }
+
+        if (list != null)
+        {
+            list.refreshEntries();
+        }
+
+        this.initGui();
     }
 
     @Override
@@ -112,11 +138,13 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
                                                      StringUtils.translate("lmswap.gui.checkbox.keep_properties"),
                                                      StringUtils.translate("lmswap.gui.checkbox.keep_properties.hover"));
         checkBox.setChecked(this.keepProperties, false);
-        checkBox.setListener(cb -> {
-            this.keepProperties = cb.isChecked();
-            this.initGui();
-        });
+        checkBox.setListener(cb -> this.onKeepPropertiesChanged(cb.isChecked()));
         this.addWidget(checkBox);
+
+        String hint = StringUtils.translate(this.keepProperties ? "lmswap.gui.label.targets_compatible"
+                                                                : "lmswap.gui.label.targets_all",
+                                            this.targets.size() - 1);
+        this.addLabel(checkBox.getX() + checkBox.getWidth() + 12, y + 1, this.getStringWidth(hint), 10, 0xFFA0A0A0, hint);
 
         int buttonY = this.getScreenHeight() - 26;
         ButtonGeneric cancel = new ButtonGeneric(this.getScreenWidth() - 10, buttonY, -1, true, "lmswap.gui.button.cancel");

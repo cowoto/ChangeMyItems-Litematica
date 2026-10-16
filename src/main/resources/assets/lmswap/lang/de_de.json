@@ -26,5 +26,7 @@
 	"lmswap.warning.property_lost": "Property '%s' geht verloren",
 	"lmswap.warning.properties_reset": "Block-Properties werden auf die Standardwerte des Ziels gesetzt",
 	"lmswap.warning.block_entity_data_lost": "Block-Entity-Daten (z. B. Inhalte von Behältern) werden entfernt",
-	"lmswap.warning.material_removed": "Das Material wird aus der Schematic entfernt"
+	"lmswap.warning.material_removed": "Das Material wird aus der Schematic entfernt",
+	"lmswap.gui.label.targets_compatible": "%s Blöcke mit gleichen Properties",
+	"lmswap.gui.label.targets_all": "%s Blöcke (Properties werden zurückgesetzt)"
 }

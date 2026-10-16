@@ -26,5 +26,7 @@
 	"lmswap.warning.property_lost": "Property '%s' will be lost",
 	"lmswap.warning.properties_reset": "Block properties will be reset to the target's defaults",
 	"lmswap.warning.block_entity_data_lost": "Block entity data (e.g. container contents) will be removed",
-	"lmswap.warning.material_removed": "The material will be removed from the schematic"
+	"lmswap.warning.material_removed": "The material will be removed from the schematic",
+	"lmswap.gui.label.targets_compatible": "%s blocks with the same properties",
+	"lmswap.gui.label.targets_all": "%s blocks (properties are reset)"
 }

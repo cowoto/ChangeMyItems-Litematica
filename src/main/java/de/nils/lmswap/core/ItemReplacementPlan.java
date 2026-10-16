@@ -109,9 +109,10 @@ public final class ItemReplacementPlan
     }
 
     /**
-     * Decision 3 (strict): the target must define the same properties as every source block. Air is always allowed.
+     * Decision 3 (strict): when properties are kept, the target must define the same properties as every source
+     * block. Without keeping properties every block is allowed (it gets its default state). Air is always allowed.
      */
-    public boolean isAllowedTarget(Block target)
+    public boolean isAllowedTarget(Block target, boolean keepProperties)
     {
         if (target.defaultBlockState().isAir())
         {
@@ -121,6 +122,11 @@ public final class ItemReplacementPlan
         if (this.sourceBlocks.contains(target))
         {
             return false;
+        }
+
+        if (keepProperties == false)
+        {
+            return true;
         }
 
         for (Block source : this.sourceBlocks)

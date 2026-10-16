@@ -96,6 +96,8 @@ class SchematicReplacerContainerTest
         assertFalse(ReplacementRule.ofBlock(Blocks.SMOOTH_STONE_SLAB, Blocks.STONE).isPropertyCompatible());
         assertTrue(ReplacementRule.ofBlock(Blocks.SMOOTH_STONE_SLAB, Blocks.STONE).withRequireSameProperties(false).isPropertyCompatible());
         assertTrue(ReplacementRule.ofBlock(Blocks.SMOOTH_STONE_SLAB, Blocks.AIR).isPropertyCompatible());
+        // Without keeping properties the target gets its default state, so any block is fine
+        assertTrue(ReplacementRule.ofBlock(Blocks.SMOOTH_STONE_SLAB, Blocks.STONE).withKeepProperties(false).isPropertyCompatible());
     }
 
     @Test
