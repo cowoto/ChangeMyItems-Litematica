@@ -1,0 +1,27 @@
+{
+	"schemaVersion": 1,
+	"id": "lmswap",
+	"version": "${version}",
+	"name": "Litematica Material Swap",
+	"description": "Replace materials of a loaded Litematica schematic directly from the material list.",
+	"authors": [
+		"Nils"
+	],
+	"license": "LGPL-3.0",
+	"environment": "client",
+	"entrypoints": {
+		"client": [
+			"de.nils.lmswap.LmSwapClient"
+		]
+	},
+	"mixins": [
+		"lmswap.mixins.json"
+	],
+	"depends": {
+		"minecraft": ">=${minecraft_version} <26.4",
+		"fabricloader": ">=${fabric_loader_version}",
+		"fabric-api": ">=${fabric_api_version}",
+		"malilib": ">=${malilib_version}- <0.31.0-",
+		"litematica": ">=${litematica_version}- <0.30.0-"
+	}
+}

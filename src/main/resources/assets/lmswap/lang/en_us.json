@@ -1,0 +1,6 @@
+{
+	"lmswap.mod.name": "Litematica Material Swap",
+	"lmswap.gui.button.material_list.replace": "Replace",
+	"lmswap.gui.button.material_list.undo": "Undo",
+	"lmswap.gui.button.material_list.save_as": "Save as..."
+}

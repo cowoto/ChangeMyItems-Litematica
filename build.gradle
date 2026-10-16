@@ -1,0 +1,62 @@
+plugins {
+	// Non-remapping Loom for unobfuscated Minecraft 26.x (same plugin as Litematica/MaLiLib)
+	id 'net.fabricmc.fabric-loom' version '1.18.+'
+}
+
+base {
+	archivesName = "${project.archives_base_name}-mc${project.minecraft_version}"
+}
+
+group = project.maven_group
+version = project.mod_version
+
+repositories {
+	maven {
+		url = 'https://masa.dy.fi/maven/sakura-ryoko'
+		content { includeGroupAndSubgroups('fi.dy.masa') }
+	}
+	// Runtime dependency of Litematica/MaLiLib (conditional-mixin)
+	maven {
+		url = 'https://maven.fallenbreath.me/releases'
+		content { includeGroupAndSubgroups('me.fallenbreath') }
+	}
+}
+
+dependencies {
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+	implementation "net.fabricmc:fabric-loader:${project.fabric_loader_version}"
+	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// On the classpath for compiling and runClient, never bundled (no include()).
+	// Non-remapping Loom has no modImplementation; implementation is the equivalent.
+	implementation "fi.dy.masa.malilib:malilib-fabric-${project.minecraft_version}:${project.malilib_version}"
+	implementation "fi.dy.masa.litematica:litematica-fabric-${project.minecraft_version}:${project.litematica_version}"
+}
+
+processResources {
+	def props = [
+		version: project.mod_version,
+		minecraft_version: project.minecraft_version,
+		fabric_loader_version: project.fabric_loader_version,
+		fabric_api_version: project.fabric_api_version,
+		malilib_version: project.malilib_version,
+		litematica_version: project.litematica_version
+	]
+	inputs.properties props
+
+	filesMatching('fabric.mod.json') {
+		expand props
+	}
+}
+
+java {
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(25)
+	}
+	withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.encoding = 'UTF-8'
+	it.options.release = 25
+}
