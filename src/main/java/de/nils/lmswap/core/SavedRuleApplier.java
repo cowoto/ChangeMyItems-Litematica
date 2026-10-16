@@ -8,6 +8,7 @@ import java.util.Set;
 
 import fi.dy.masa.litematica.schematic.LitematicaSchematic;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 
 import de.nils.lmswap.data.RuleStore;
@@ -69,8 +70,16 @@ public final class SavedRuleApplier
 
             ItemReplacementPlan plan = ItemReplacementPlan.forItem(schematic, source.get());
 
-            if (plan.isEmpty())
+            // Source == target (e.g. a rule edited by hand): nothing to do, not an error
+            if (plan.isEmpty() || plan.getSourceBlocks().contains(target.get()))
             {
+                continue;
+            }
+
+            // Same restriction as the target list in the GUI: only blocks with an item (Easy Place needs one), or air
+            if (target.get().asItem() == Items.AIR && target.get().defaultBlockState().isAir() == false)
+            {
+                ++skipped;
                 continue;
             }
 

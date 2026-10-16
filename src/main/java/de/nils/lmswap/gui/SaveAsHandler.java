@@ -31,6 +31,12 @@ public final class SaveAsHandler
 
     public static void open(ReplaceContext context, GuiMaterialList parent)
     {
+        if (context.isStillLoaded() == false)
+        {
+            parent.addMessage(MessageType.ERROR, "lmswap.error.schematic_not_loaded");
+            return;
+        }
+
         LitematicaSchematic schematic = context.schematic();
         Path dir = directoryFor(schematic);
 

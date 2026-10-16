@@ -20,6 +20,22 @@ import net.minecraft.world.ticks.ScheduledTick;
  */
 public record SchematicChange(List<RegionChange> regions, int totalBlocksDelta)
 {
+    /** Number of recorded positions, i.e. the memory cost of this undo entry (4 bytes each) */
+    public long changedPositions()
+    {
+        long count = 0;
+
+        for (RegionChange region : this.regions)
+        {
+            for (IntArrayList indices : region.oldStates().values())
+            {
+                count += indices.size();
+            }
+        }
+
+        return count;
+    }
+
     public record RegionChange(String regionName,
                                Map<BlockState, IntArrayList> oldStates,
                                Map<BlockPos, CompoundData> removedBlockEntities,

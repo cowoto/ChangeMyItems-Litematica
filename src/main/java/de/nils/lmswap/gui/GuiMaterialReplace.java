@@ -343,6 +343,12 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
             return;
         }
 
+        if (this.context.isStillLoaded() == false)
+        {
+            this.addMessage(MessageType.ERROR, "lmswap.error.schematic_not_loaded");
+            return;
+        }
+
         ReplacementResult result = MaterialSwapService.replaceInSchematic(this.context.schematic(),
                                                                           this.plan.rulesFor(this.selected, this.keepProperties),
                                                                           this.entry.getStack().getHoverName().getString(),

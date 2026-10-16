@@ -63,6 +63,13 @@ public final class MaterialListButtons
 
     private static void undo(ReplaceContext context, GuiMaterialList gui)
     {
+        if (context.isStillLoaded() == false)
+        {
+            gui.addMessage(MessageType.ERROR, "lmswap.error.schematic_not_loaded");
+            gui.initGui();
+            return;
+        }
+
         Optional<ReplacementHistory.Entry> undone = MaterialSwapService.undoLast(context.schematic());
 
         if (undone.isPresent())

@@ -82,6 +82,12 @@ public final class ItemReplacementPlan
         return new ItemReplacementPlan(schematic, item, new ArrayList<>(states));
     }
 
+    /** For tests: a plan with given source states, without the item lookup through Litematica's MaterialCache */
+    static ItemReplacementPlan forStates(LitematicaSchematic schematic, Item item, List<BlockState> states)
+    {
+        return new ItemReplacementPlan(schematic, item, states);
+    }
+
     public LitematicaSchematic getSchematic()
     {
         return this.schematic;
@@ -191,14 +197,29 @@ public final class ItemReplacementPlan
             {
                 warnings.add(Message.of("lmswap.warning.block_entity_data_lost"));
             }
+
+            if (targetIsAir == false && isWaterlogged(state))
+            {
+                BlockState mapped = keepProperties ? BlockStateMapper.map(state, target).state() : target.defaultBlockState();
+
+                if (isWaterlogged(mapped) == false)
+                {
+                    warnings.add(Message.of("lmswap.warning.water_lost"));
+                }
+            }
         }
 
         return List.copyOf(warnings);
     }
 
+    private static boolean isWaterlogged(BlockState state)
+    {
+        return state.hasProperty(BlockStateProperties.WATERLOGGED) && state.getValue(BlockStateProperties.WATERLOGGED);
+    }
+
     private static BlockState dryState(BlockState state)
     {
-        if (state.hasProperty(BlockStateProperties.WATERLOGGED) && state.getValue(BlockStateProperties.WATERLOGGED))
+        if (isWaterlogged(state))
         {
             return state.setValue(BlockStateProperties.WATERLOGGED, false);
         }

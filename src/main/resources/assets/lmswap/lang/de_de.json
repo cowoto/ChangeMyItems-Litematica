@@ -63,5 +63,7 @@
 	"lmswap.gui.label.rules_more": "+%s weitere",
 	"lmswap.gui.button.rule_delete.hover": "Diese Regel löschen",
 	"lmswap.info.rules_auto_applied": "%s gespeicherte Regel(n) (%s Blöcke) auf '%s' angewendet",
-	"lmswap.warning.rules_skipped": "%s gespeicherte Regel(n) konnten nicht auf '%s' angewendet werden (unbekannter Block/Item oder andere Properties)"
+	"lmswap.warning.rules_skipped": "%s gespeicherte Regel(n) konnten nicht auf '%s' angewendet werden (unbekannter Block/Item oder andere Properties)",
+	"lmswap.warning.water_lost": "Wassergeflutete Blöcke verlieren ihr Wasser (Zielblock kann nicht geflutet sein)",
+	"lmswap.error.schematic_not_loaded": "Die Schematic bzw. das Placement dieser Material List ist nicht mehr geladen"
 }

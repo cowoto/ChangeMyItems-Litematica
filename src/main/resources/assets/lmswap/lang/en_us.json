@@ -63,5 +63,7 @@
 	"lmswap.gui.label.rules_more": "+%s more",
 	"lmswap.gui.button.rule_delete.hover": "Delete this rule",
 	"lmswap.info.rules_auto_applied": "Applied %s saved rule(s) (%s blocks) to '%s'",
-	"lmswap.warning.rules_skipped": "%s saved rule(s) could not be applied to '%s' (unknown block/item or different properties)"
+	"lmswap.warning.rules_skipped": "%s saved rule(s) could not be applied to '%s' (unknown block/item or different properties)",
+	"lmswap.warning.water_lost": "Waterlogged blocks lose their water (the target can not be waterlogged)",
+	"lmswap.error.schematic_not_loaded": "The schematic or placement of this material list is no longer loaded"
 }
