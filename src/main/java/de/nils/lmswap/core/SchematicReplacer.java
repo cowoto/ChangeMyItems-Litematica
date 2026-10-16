@@ -243,6 +243,53 @@ public final class SchematicReplacer
         return count;
     }
 
+    /**
+     * Blocks per state over all regions (air excluded), e.g. to list the materials of a schematic.
+     */
+    public static Map<BlockState, Integer> countAllStates(LitematicaSchematic schematic)
+    {
+        Map<BlockState, Integer> counts = new HashMap<>();
+
+        for (String regionName : schematic.getAreas().keySet())
+        {
+            LitematicaBlockStateContainer container = schematic.getSubRegionContainer(regionName);
+
+            if (container == null)
+            {
+                continue;
+            }
+
+            ILitematicaBlockStatePalette palette = container.getPalette();
+            final int paletteSize = palette.getPaletteSize();
+            int[] perId = new int[paletteSize];
+            LitematicaBitArray storage = container.getArray();
+            Vec3i size = container.getSize();
+            final long volume = (long) size.getX() * size.getY() * size.getZ();
+
+            for (long index = 0; index < volume; ++index)
+            {
+                int id = storage.getAt(index);
+
+                if (id < paletteSize)
+                {
+                    ++perId[id];
+                }
+            }
+
+            for (int id = 0; id < paletteSize; ++id)
+            {
+                BlockState state = palette.getBlockState(id);
+
+                if (perId[id] > 0 && state != null && state.isAir() == false)
+                {
+                    counts.merge(state, perId[id], Integer::sum);
+                }
+            }
+        }
+
+        return counts;
+    }
+
     static int countMatching(LitematicaBlockStateContainer container, List<ReplacementRule> rules)
     {
         return count(container, Compiled.of(container, rules, wholeParts(rules.size()), null));

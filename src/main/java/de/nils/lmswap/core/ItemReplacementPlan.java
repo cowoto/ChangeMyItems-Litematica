@@ -13,7 +13,6 @@ import fi.dy.masa.litematica.schematic.LitematicaSchematic;
 import fi.dy.masa.litematica.schematic.container.ILitematicaBlockStatePalette;
 import fi.dy.masa.litematica.schematic.container.LitematicaBlockStateContainer;
 import net.minecraft.world.item.Item;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
@@ -49,7 +48,11 @@ public final class ItemReplacementPlan
 
     public static ItemReplacementPlan forItem(LitematicaSchematic schematic, Item item)
     {
-        MaterialCache cache = MaterialCache.getInstance();
+        return forItem(schematic, item, MaterialResolver.LITEMATICA);
+    }
+
+    public static ItemReplacementPlan forItem(LitematicaSchematic schematic, Item item, MaterialResolver resolver)
+    {
         Set<BlockState> states = new LinkedHashSet<>();
 
         for (String regionName : schematic.getAreas().keySet())
@@ -67,15 +70,9 @@ public final class ItemReplacementPlan
             {
                 BlockState state = palette.getBlockState(id);
 
-                if (state != null && state.isAir() == false && states.contains(state) == false
-                    && cache.requiresMultipleItems(state) == false)
+                if (state != null && states.contains(state) == false && resolver.sourceItem(state) == item)
                 {
-                    ItemStack stack = cache.getRequiredBuildItemForState(dryState(state));
-
-                    if (stack.isEmpty() == false && stack.getItem() == item)
-                    {
-                        states.add(state);
-                    }
+                    states.add(state);
                 }
             }
         }
@@ -348,13 +345,4 @@ public final class ItemReplacementPlan
         return state.hasProperty(BlockStateProperties.WATERLOGGED) && state.getValue(BlockStateProperties.WATERLOGGED);
     }
 
-    private static BlockState dryState(BlockState state)
-    {
-        if (isWaterlogged(state))
-        {
-            return state.setValue(BlockStateProperties.WATERLOGGED, false);
-        }
-
-        return state;
-    }
 }

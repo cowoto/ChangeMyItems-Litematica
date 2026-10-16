@@ -25,6 +25,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class FilterPreviewTest
 {
+    static
+    {
+        // Before the BlockState constants below: they need registered blocks
+        MinecraftTestBootstrap.init();
+    }
+
     private static final BlockState TOP = Blocks.SMOOTH_STONE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.TOP);
     private static final BlockState BOTTOM = Blocks.SMOOTH_STONE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.BOTTOM);
     private static final BlockState DOUBLE = Blocks.SMOOTH_STONE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.DOUBLE);

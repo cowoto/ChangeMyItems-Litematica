@@ -68,6 +68,32 @@ public final class MaterialSwapService
     }
 
     /**
+     * Runs a batch (part D): one undo step, one rebuild and one material list refresh at the end.
+     *
+     * @param undoSourceName / undoTargetName labels for the undo history
+     */
+    public static ReplacementResult replaceBatch(LitematicaSchematic schematic, @Nullable SchematicPlacement placement,
+                                                 List<BatchRule> rules, Scope batchScope, de.nils.lmswap.data.RuleSet.ChainMode mode,
+                                                 String undoSourceName, String undoTargetName)
+    {
+        if (Minecraft.getInstance().level == null)
+        {
+            return ReplacementResult.rejected(Message.of("lmswap.error.no_world"));
+        }
+
+        ReplacementResult result = BatchReplacer.execute(schematic, placement, rules, batchScope, mode, MaterialResolver.LITEMATICA);
+
+        if (result.change() != null)
+        {
+            ReplacementHistory.INSTANCE.push(schematic, new ReplacementHistory.Entry(result.change(), undoSourceName,
+                                                                                     undoTargetName, result.totalReplaced()));
+            refreshAfterChange(schematic);
+        }
+
+        return result;
+    }
+
+    /**
      * Reverts the most recent replacement of the schematic.
      *
      * @return the reverted entry, empty if there was nothing to undo or no world is loaded

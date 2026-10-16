@@ -46,7 +46,7 @@ public final class RuleTexts
             sb.append(' ').append(StringUtils.translate("lmswap.gui.label.rule_reset"));
         }
 
-        if (rule.scope().type() != SavedScope.Type.ALL)
+        if (rule.scope().type() != SavedScope.Type.ALL && rule.scope().type() != SavedScope.Type.INHERIT)
         {
             sb.append(GuiBase.TXT_AQUA).append(' ').append(scope(rule.scope())).append(GuiBase.TXT_RST);
         }
@@ -87,6 +87,7 @@ public final class RuleTexts
         return switch (scope.type())
         {
             case ALL -> StringUtils.translate("lmswap.gui.button.scope.whole");
+            case INHERIT -> StringUtils.translate("lmswap.gui.button.scope.inherit");
             case REGIONS -> StringUtils.translate("lmswap.gui.label.scope_regions_short", String.join(", ", scope.regions()));
             case SELECTION -> StringUtils.translate("lmswap.gui.button.scope.selection");
         };

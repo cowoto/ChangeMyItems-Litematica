@@ -20,6 +20,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class ItemReplacementPlanTest
 {
+    static
+    {
+        // Before the BlockState constants below: they need registered blocks
+        MinecraftTestBootstrap.init();
+    }
+
     private static final BlockState WET_SLAB = Blocks.SMOOTH_STONE_SLAB.defaultBlockState().setValue(SlabBlock.WATERLOGGED, true);
     private static final BlockState DOUBLE_SLAB = Blocks.SMOOTH_STONE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.DOUBLE);
 

@@ -12,15 +12,18 @@ import de.nils.lmswap.core.Scope;
 /**
  * Persisted scope of a rule or rule set. {@link Type#SELECTION} stores no coordinates: it means "the area selection
  * that is active when the rule is applied" and is therefore skipped by the automatic application on load.
+ * {@link Type#INHERIT} is only meaningful for rules inside a rule set (batch): the rule uses the batch scope.
+ * Outside a batch it behaves like {@link Type#ALL}.
  */
 public record SavedScope(Type type, List<String> regions)
 {
     public static final SavedScope ALL = new SavedScope(Type.ALL, List.of());
     public static final SavedScope SELECTION = new SavedScope(Type.SELECTION, List.of());
+    public static final SavedScope INHERIT = new SavedScope(Type.INHERIT, List.of());
 
     public enum Type
     {
-        ALL, REGIONS, SELECTION
+        ALL, REGIONS, SELECTION, INHERIT
     }
 
     public SavedScope
@@ -40,7 +43,7 @@ public record SavedScope(Type type, List<String> regions)
     {
         return switch (this.type)
         {
-            case ALL -> java.util.Optional.of(Scope.WHOLE);
+            case ALL, INHERIT -> java.util.Optional.of(Scope.WHOLE);
             case REGIONS -> java.util.Optional.of(new Scope.Regions(java.util.Set.copyOf(this.regions)));
             case SELECTION -> java.util.Optional.empty();
         };
@@ -84,6 +87,7 @@ public record SavedScope(Type type, List<String> regions)
                 yield regions(names);
             }
             case "selection" -> SELECTION;
+            case "inherit" -> INHERIT;
             default -> ALL;
         };
     }

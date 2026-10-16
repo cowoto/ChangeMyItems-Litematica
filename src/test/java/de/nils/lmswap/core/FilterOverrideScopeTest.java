@@ -28,6 +28,12 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  */
 class FilterOverrideScopeTest
 {
+    static
+    {
+        // Before the BlockState constants below: they need registered blocks
+        MinecraftTestBootstrap.init();
+    }
+
     private static final BlockState TOP = slab(Blocks.SMOOTH_STONE_SLAB, SlabType.TOP, false);
     private static final BlockState BOTTOM = slab(Blocks.SMOOTH_STONE_SLAB, SlabType.BOTTOM, false);
     private static final BlockState DOUBLE = slab(Blocks.SMOOTH_STONE_SLAB, SlabType.DOUBLE, false);

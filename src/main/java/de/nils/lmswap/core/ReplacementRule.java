@@ -161,18 +161,29 @@ public record ReplacementRule(Block sourceBlock, @Nullable BlockState sourceStat
             }
         }
 
-        for (Map.Entry<String, String> override : this.overrides.entrySet())
+        errors.addAll(validateOverrides(this.target, this.overrides));
+        return errors;
+    }
+
+    /**
+     * Overrides must name properties and values the target block has.
+     */
+    public static List<Message> validateOverrides(Block target, Map<String, String> overrides)
+    {
+        List<Message> errors = new ArrayList<>();
+
+        for (Map.Entry<String, String> override : overrides.entrySet())
         {
-            Property<?> prop = this.target.getStateDefinition().getProperty(override.getKey());
+            Property<?> prop = target.getStateDefinition().getProperty(override.getKey());
 
             if (prop == null)
             {
-                errors.add(Message.of("lmswap.error.override_unknown_property", override.getKey(), BlockStateMapper.blockId(this.target)));
+                errors.add(Message.of("lmswap.error.override_unknown_property", override.getKey(), BlockStateMapper.blockId(target)));
             }
             else if (prop.getValue(override.getValue()).isEmpty())
             {
                 errors.add(Message.of("lmswap.error.override_invalid_value", override.getKey(), override.getValue(),
-                                      BlockStateMapper.blockId(this.target)));
+                                      BlockStateMapper.blockId(target)));
             }
         }
 

@@ -8,6 +8,7 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import javax.annotation.Nullable;
 
@@ -51,6 +52,9 @@ import de.nils.lmswap.data.SavedScope;
  *       sections (part C), the live preview and the replace/cancel buttons.</li>
  *   <li>Right: area switcher (part B) and the saved rules.</li>
  * </ul>
+ * Edit mode (part D): with a rule consumer the screen edits a batch rule instead of replacing. The button becomes
+ * "Accept", the area switcher offers "Batch area" (the rule uses the batch scope), and an existing rule is pre-filled.
+ * <p>
  * Counting: the blocks per source state in the chosen area are counted once (one pass over the schematic) whenever
  * the area changes. Filter changes only sum those counts, so the preview updates instantly even for large schematics.
  */
@@ -76,6 +80,11 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
     private boolean rememberGlobal;
     @Nullable private Block selected;
 
+    // Part D: edit mode for batch rules
+    @Nullable private final Consumer<SavedRule> ruleConsumer;
+    private final Scope inheritedScope;
+    @Nullable private Block pendingPreselect;
+
     // Part B: where to replace
     private ScopeMode scopeMode = ScopeMode.WHOLE;
     private final List<String> regionNames;
@@ -96,6 +105,7 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
 
     private enum ScopeMode
     {
+        INHERIT("lmswap.gui.button.scope.inherit"),
         WHOLE("lmswap.gui.button.scope.whole"),
         REGIONS("lmswap.gui.button.scope.regions"),
         SELECTION("lmswap.gui.button.scope.selection");
@@ -115,8 +125,21 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
 
     public GuiMaterialReplace(ReplaceContext context, MaterialListEntry entry)
     {
+        this(context, entry, null, null, Scope.WHOLE);
+    }
+
+    /**
+     * @param initial        rule to pre-fill (edit mode), may be null
+     * @param ruleConsumer   non-null = edit mode: "Accept" hands the rule to the consumer instead of replacing
+     * @param inheritedScope the batch scope, used for counting when the rule uses "Batch area"
+     */
+    public GuiMaterialReplace(ReplaceContext context, MaterialListEntry entry, @Nullable SavedRule initial,
+                              @Nullable Consumer<SavedRule> ruleConsumer, Scope inheritedScope)
+    {
         super(10, LIST_Y);
 
+        this.ruleConsumer = ruleConsumer;
+        this.inheritedScope = inheritedScope;
         this.context = context;
         this.entry = entry;
         this.plan = ItemReplacementPlan.forItem(context.schematic(), entry.getStack().getItem());
@@ -132,8 +155,61 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         this.sourceProperties = this.plan.sourceProperties();
         this.sourceProperties.forEach((property, values) -> this.filterSelection.put(property, new LinkedHashSet<>(values)));
 
+        if (this.isEditMode())
+        {
+            this.scopeMode = ScopeMode.INHERIT;
+        }
+
+        if (initial != null)
+        {
+            this.applyInitial(initial);
+        }
+
         this.refreshSelection();
         this.recount();
+    }
+
+    private boolean isEditMode()
+    {
+        return this.ruleConsumer != null;
+    }
+
+    /** Pre-fills the screen from an existing rule (edit mode) */
+    private void applyInitial(SavedRule rule)
+    {
+        if (this.keepProperties != rule.keepProperties())
+        {
+            this.keepProperties = rule.keepProperties();
+            this.collectTargets();
+        }
+
+        rule.resolveTarget().filter(this.targets::contains).ifPresent(target -> {
+            this.selected = target;
+            this.pendingPreselect = target;
+        });
+
+        rule.conditions().forEach((property, values) -> {
+            Set<String> selection = this.filterSelection.get(property);
+
+            if (selection != null)
+            {
+                selection.retainAll(values);
+            }
+        });
+
+        this.overrides.putAll(rule.overrides());
+        this.pruneOverrides();
+
+        switch (rule.scope().type())
+        {
+            case ALL -> this.scopeMode = ScopeMode.WHOLE;
+            case INHERIT -> this.scopeMode = this.isEditMode() ? ScopeMode.INHERIT : ScopeMode.WHOLE;
+            case SELECTION -> this.scopeMode = ScopeMode.SELECTION;
+            case REGIONS -> {
+                this.scopeMode = ScopeMode.REGIONS;
+                this.selectedRegions.retainAll(rule.scope().regions());
+            }
+        }
     }
 
     // ---- targets ----
@@ -209,6 +285,7 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
     {
         return switch (this.scopeMode)
         {
+            case INHERIT -> this.inheritedScope;
             case WHOLE -> Scope.WHOLE;
             case REGIONS -> new Scope.Regions(this.selectedRegions);
             case SELECTION -> this.selectionBoxes != null ? this.selectionBoxes : Scope.WHOLE;
@@ -219,6 +296,7 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
     {
         return switch (this.scopeMode)
         {
+            case INHERIT -> SavedScope.INHERIT;
             case WHOLE -> SavedScope.ALL;
             case REGIONS -> SavedScope.regions(new ArrayList<>(this.selectedRegions));
             case SELECTION -> SavedScope.SELECTION;
@@ -380,6 +458,12 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
     {
         super.initGui();
 
+        if (this.pendingPreselect != null && this.getListWidget() != null)
+        {
+            this.getListWidget().setLastSelectedEntry(this.pendingPreselect, this.targets.indexOf(this.pendingPreselect));
+            this.pendingPreselect = null;
+        }
+
         int y = LIST_Y + this.getBrowserHeight() + 4;
 
         WidgetCheckBox checkBox = new WidgetCheckBox(12, y, Icons.CHECKBOX_UNSELECTED, Icons.CHECKBOX_SELECTED,
@@ -397,7 +481,11 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         y += 14;
         int x = 12;
 
-        if (RuleStore.INSTANCE.canStoreFor(this.context.schematic()))
+        if (this.isEditMode())
+        {
+            // Batch rules are saved with the rule set, not individually
+        }
+        else if (RuleStore.INSTANCE.canStoreFor(this.context.schematic()))
         {
             WidgetCheckBox rememberSchematic = new WidgetCheckBox(x, y, Icons.CHECKBOX_UNSELECTED, Icons.CHECKBOX_SELECTED,
                                                                   StringUtils.translate("lmswap.gui.checkbox.remember_schematic"),
@@ -408,12 +496,15 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
             x += rememberSchematic.getWidth() + 16;
         }
 
-        WidgetCheckBox rememberGlobal = new WidgetCheckBox(x, y, Icons.CHECKBOX_UNSELECTED, Icons.CHECKBOX_SELECTED,
-                                                           StringUtils.translate("lmswap.gui.checkbox.remember_global"),
-                                                           StringUtils.translate("lmswap.gui.checkbox.remember_global.hover"));
-        rememberGlobal.setChecked(this.rememberGlobal, false);
-        rememberGlobal.setListener(cb -> this.rememberGlobal = cb.isChecked());
-        this.addWidget(rememberGlobal);
+        if (this.isEditMode() == false)
+        {
+            WidgetCheckBox rememberGlobal = new WidgetCheckBox(x, y, Icons.CHECKBOX_UNSELECTED, Icons.CHECKBOX_SELECTED,
+                                                               StringUtils.translate("lmswap.gui.checkbox.remember_global"),
+                                                               StringUtils.translate("lmswap.gui.checkbox.remember_global.hover"));
+            rememberGlobal.setChecked(this.rememberGlobal, false);
+            rememberGlobal.setListener(cb -> this.rememberGlobal = cb.isChecked());
+            this.addWidget(rememberGlobal);
+        }
 
         // Section toggles
         y += 16;
@@ -441,8 +532,9 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         ButtonGeneric cancel = new ButtonGeneric(this.getScreenWidth() - 10, buttonY, -1, true, "lmswap.gui.button.cancel");
         this.addButton(cancel, (button, mouseButton) -> this.closeGui(true));
 
-        ButtonGeneric replace = new ButtonGeneric(cancel.getX() - 4, buttonY, -1, true, "lmswap.gui.button.replace_confirm");
-        replace.setEnabled(this.selected != null && this.filteredCount() > 0);
+        ButtonGeneric replace = new ButtonGeneric(cancel.getX() - 4, buttonY, -1, true,
+                                                  this.isEditMode() ? "lmswap.gui.button.accept_rule" : "lmswap.gui.button.replace_confirm");
+        replace.setEnabled(this.selected != null && (this.isEditMode() ? this.filterError() == null : this.filteredCount() > 0));
         this.addButton(replace, (button, mouseButton) -> this.replace());
 
         // Decision 4: replacements live only in memory until saved as a new schematic
@@ -589,6 +681,11 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
 
         for (ScopeMode mode : ScopeMode.values())
         {
+            if (mode == ScopeMode.INHERIT && this.isEditMode() == false)
+            {
+                continue;
+            }
+
             boolean active = mode == this.scopeMode;
             String label = (active ? "» " : "") + StringUtils.translate(mode.translationKey);
             ButtonGeneric button = new ButtonGeneric(panelX, y, width, 16, label);
@@ -823,6 +920,14 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
     {
         if (this.selected == null || this.filterError() != null)
         {
+            return;
+        }
+
+        if (this.ruleConsumer != null)
+        {
+            this.ruleConsumer.accept(SavedRule.of(this.entry.getStack().getItem(), this.selected, this.keepProperties)
+                                              .withFilter(this.currentConditions(), this.effectiveOverrides(), this.currentSavedScope()));
+            this.closeGui(true);
             return;
         }
 

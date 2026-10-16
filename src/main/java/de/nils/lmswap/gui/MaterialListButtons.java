@@ -59,6 +59,20 @@ public final class MaterialListButtons
         }
 
         gui.addButton(undo, (button, mouseButton) -> undo(context, gui));
+
+        ButtonGeneric batch = new ButtonGeneric(undo.getX() - 2, y, -1, true, "lmswap.gui.button.material_list.batch");
+        batch.setHoverStrings("lmswap.gui.button.material_list.batch.hover");
+        gui.addButton(batch, (button, mouseButton) -> {
+            if (context.isStillLoaded() == false)
+            {
+                gui.addMessage(MessageType.ERROR, "lmswap.error.schematic_not_loaded");
+                return;
+            }
+
+            GuiBatchReplace screen = new GuiBatchReplace(context);
+            screen.setParent(gui);
+            fi.dy.masa.malilib.gui.GuiBase.openGui(screen);
+        });
     }
 
     private static void undo(ReplaceContext context, GuiMaterialList gui)
