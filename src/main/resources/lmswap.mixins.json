@@ -4,7 +4,10 @@
 	"compatibilityLevel": "JAVA_25",
 	"minVersion": "0.8",
 	"client": [
-		"SchematicPlacementAccessor"
+		"MaterialListPlacementAccessor",
+		"MaterialListSchematicAccessor",
+		"SchematicPlacementAccessor",
+		"WidgetMaterialListEntryMixin"
 	],
 	"injectors": {
 		"defaultRequire": 1

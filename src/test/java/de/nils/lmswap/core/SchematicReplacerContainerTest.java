@@ -106,6 +106,31 @@ class SchematicReplacerContainerTest
     }
 
     @Test
+    void severalStateRulesCountAndReplaceInOnePass()
+    {
+        // Like a material list entry "Oak Slab": one rule per state found in the palette
+        LitematicaBlockStateContainer container = new LitematicaBlockStateContainer(3, 1, 1);
+        BlockState slabTop = Blocks.OAK_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.TOP);
+        BlockState slabDouble = Blocks.OAK_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.DOUBLE);
+        container.set(0, 0, 0, slabTop);
+        container.set(1, 0, 0, slabDouble);
+        container.set(2, 0, 0, Blocks.DIRT.defaultBlockState());
+
+        java.util.List<ReplacementRule> rules = java.util.List.of(ReplacementRule.ofState(slabTop, Blocks.SPRUCE_SLAB),
+                                                                  ReplacementRule.ofState(slabDouble, Blocks.SPRUCE_SLAB));
+
+        assertEquals(2, SchematicReplacer.countMatching(container, rules));
+
+        SchematicReplacer.ContainerChange change = SchematicReplacer.replaceInContainer(container, rules, new LinkedHashSet<>());
+
+        assertEquals(2, change.count());
+        assertEquals(Blocks.SPRUCE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.TOP), container.get(0, 0, 0));
+        assertEquals(Blocks.SPRUCE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.DOUBLE), container.get(1, 0, 0));
+        assertEquals(Blocks.DIRT.defaultBlockState(), container.get(2, 0, 0));
+        assertEquals(0, SchematicReplacer.countMatching(container, rules));
+    }
+
+    @Test
     void noMatchLeavesContainerUntouched()
     {
         LitematicaBlockStateContainer container = new LitematicaBlockStateContainer(1, 1, 1);

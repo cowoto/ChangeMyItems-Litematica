@@ -10,7 +10,21 @@
 	"lmswap.error.no_world": "No world loaded",
 	"lmswap.error.no_placement_selected": "No schematic placement selected",
 	"lmswap.warning.shared_schematic": "Warning: %s placements share this schematic, the replacement affects all of them",
-	"lmswap.debug.confirm_hint": "Run %s to replace anyway",
 	"lmswap.info.replaced_total": "Replaced %s blocks in '%s'",
-	"lmswap.info.replaced_region": "  Region '%s': %s"
+	"lmswap.info.replaced_region": "  Region '%s': %s",
+	"lmswap.gui.button.material_list.replace.hover": "Replace this material in the schematic with another block",
+	"lmswap.gui.title.replace_material": "Replace material",
+	"lmswap.gui.label.source": "Source: %s (%s blocks in the schematic, all regions)",
+	"lmswap.gui.label.target_air": "Air (remove material)",
+	"lmswap.gui.label.select_target": "Select a target block from the list",
+	"lmswap.gui.label.preview": "%s blocks will be replaced: %s → %s",
+	"lmswap.gui.checkbox.keep_properties": "Keep block properties",
+	"lmswap.gui.checkbox.keep_properties.hover": "Carry over e.g. slab type, waterlogged, stair facing/half/shape",
+	"lmswap.gui.button.replace_confirm": "Replace",
+	"lmswap.gui.button.cancel": "Cancel",
+	"lmswap.error.nothing_to_replace": "No blocks of this material found in the schematic",
+	"lmswap.warning.property_lost": "Property '%s' will be lost",
+	"lmswap.warning.properties_reset": "Block properties will be reset to the target's defaults",
+	"lmswap.warning.block_entity_data_lost": "Block entity data (e.g. container contents) will be removed",
+	"lmswap.warning.material_removed": "The material will be removed from the schematic"
 }

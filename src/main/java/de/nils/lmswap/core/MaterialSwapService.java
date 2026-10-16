@@ -10,8 +10,8 @@ import net.minecraft.client.Minecraft;
 import de.nils.lmswap.core.ReplacementResult.Message;
 
 /**
- * Connects {@link SchematicReplacer} with the running Litematica state: applies a rule to the schematic of a
- * placement and triggers the schematic world rebuild and the material list refresh.
+ * Connects {@link SchematicReplacer} with the running Litematica state: applies rules to a loaded schematic and
+ * triggers the schematic world rebuild and the material list refresh.
  * <p>
  * Placements can share one {@link LitematicaSchematic} instance (see docs/DECISIONS.md), so a replacement always
  * affects every placement of that schematic. Callers should warn the user via {@link #getPlacementsOfSchematic}.
@@ -26,13 +26,22 @@ public final class MaterialSwapService
 
     public static ReplacementResult replaceInPlacement(SchematicPlacement placement, ReplacementRule rule)
     {
+        return replaceInSchematic(placement.getSchematic(), List.of(rule));
+    }
+
+    public static ReplacementResult replaceInPlacement(SchematicPlacement placement, List<ReplacementRule> rules)
+    {
+        return replaceInSchematic(placement.getSchematic(), rules);
+    }
+
+    public static ReplacementResult replaceInSchematic(LitematicaSchematic schematic, List<ReplacementRule> rules)
+    {
         if (Minecraft.getInstance().level == null)
         {
             return ReplacementResult.rejected(Message.of("lmswap.error.no_world"));
         }
 
-        LitematicaSchematic schematic = placement.getSchematic();
-        ReplacementResult result = SchematicReplacer.apply(schematic, rule);
+        ReplacementResult result = SchematicReplacer.apply(schematic, rules);
 
         if (result.change() != null)
         {
@@ -57,6 +66,11 @@ public final class MaterialSwapService
      */
     public static List<SchematicPlacement> getPlacementsOfSchematic(SchematicPlacement placement)
     {
-        return DataManager.getSchematicPlacementManager().getAllPlacementsOfSchematic(placement.getSchematic());
+        return getPlacementsOfSchematic(placement.getSchematic());
+    }
+
+    public static List<SchematicPlacement> getPlacementsOfSchematic(LitematicaSchematic schematic)
+    {
+        return DataManager.getSchematicPlacementManager().getAllPlacementsOfSchematic(schematic);
     }
 }

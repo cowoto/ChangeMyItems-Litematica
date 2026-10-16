@@ -8,6 +8,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import javax.annotation.Nullable;
+
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
@@ -44,10 +46,22 @@ public final class SchematicReplacer
 
     public static ReplacementResult apply(LitematicaSchematic schematic, ReplacementRule rule)
     {
-        if (rule.isPropertyCompatible() == false)
+        return apply(schematic, List.of(rule));
+    }
+
+    /**
+     * Applies several rules in one pass, e.g. one per block state behind a material list entry.
+     * For each state the first matching rule wins. The result holds a single undo record.
+     */
+    public static ReplacementResult apply(LitematicaSchematic schematic, List<ReplacementRule> rules)
+    {
+        for (ReplacementRule rule : rules)
         {
-            return ReplacementResult.rejected(Message.of("lmswap.error.properties_differ",
-                                                         blockId(rule.sourceBlock()), blockId(rule.target())));
+            if (rule.isPropertyCompatible() == false)
+            {
+                return ReplacementResult.rejected(Message.of("lmswap.error.properties_differ",
+                                                             blockId(rule.sourceBlock()), blockId(rule.target())));
+            }
         }
 
         Map<String, Integer> replacedPerRegion = new LinkedHashMap<>();
@@ -68,10 +82,10 @@ public final class SchematicReplacer
             Map<BlockPos, ScheduledTick<Block>> blockTicks = schematic.getScheduledBlockTicksForRegion(regionName);
 
             // Positions with extra data that are about to be replaced; usually a tiny set compared to the volume
-            List<BlockPos> blockEntityCandidates = matchingPositions(container, blockEntities, rule);
-            List<BlockPos> blockTickCandidates = matchingPositions(container, blockTicks, rule);
+            List<BlockPos> blockEntityCandidates = matchingPositions(container, blockEntities, rules);
+            List<BlockPos> blockTickCandidates = matchingPositions(container, blockTicks, rules);
 
-            ContainerChange change = replaceInContainer(container, rule, warnings);
+            ContainerChange change = replaceInContainer(container, rules, warnings);
 
             if (change.count() == 0)
             {
@@ -162,7 +176,73 @@ public final class SchematicReplacer
         updateMetadata(schematic, -change.totalBlocksDelta());
     }
 
+    /**
+     * Counts the blocks in all regions that one of the rules would replace.
+     */
+    public static int countMatching(LitematicaSchematic schematic, List<ReplacementRule> rules)
+    {
+        int count = 0;
+
+        for (String regionName : schematic.getAreas().keySet())
+        {
+            LitematicaBlockStateContainer container = schematic.getSubRegionContainer(regionName);
+
+            if (container != null)
+            {
+                count += countMatching(container, rules);
+            }
+        }
+
+        return count;
+    }
+
+    static int countMatching(LitematicaBlockStateContainer container, List<ReplacementRule> rules)
+    {
+        ILitematicaBlockStatePalette palette = container.getPalette();
+        final int paletteSize = palette.getPaletteSize();
+        boolean[] matches = new boolean[paletteSize];
+        boolean anyMatch = false;
+
+        for (int id = 0; id < paletteSize; ++id)
+        {
+            BlockState state = palette.getBlockState(id);
+
+            if (state != null && ruleFor(rules, state) != null)
+            {
+                matches[id] = true;
+                anyMatch = true;
+            }
+        }
+
+        if (anyMatch == false)
+        {
+            return 0;
+        }
+
+        LitematicaBitArray storage = container.getArray();
+        Vec3i size = container.getSize();
+        final long volume = (long) size.getX() * size.getY() * size.getZ();
+        int count = 0;
+
+        for (long index = 0; index < volume; ++index)
+        {
+            int id = storage.getAt(index);
+
+            if (id < paletteSize && matches[id])
+            {
+                ++count;
+            }
+        }
+
+        return count;
+    }
+
     static ContainerChange replaceInContainer(LitematicaBlockStateContainer container, ReplacementRule rule, Set<Message> warnings)
+    {
+        return replaceInContainer(container, List.of(rule), warnings);
+    }
+
+    static ContainerChange replaceInContainer(LitematicaBlockStateContainer container, List<ReplacementRule> rules, Set<Message> warnings)
     {
         ILitematicaBlockStatePalette palette = container.getPalette();
         final int paletteSize = palette.getPaletteSize();
@@ -173,8 +253,9 @@ public final class SchematicReplacer
         for (int id = 0; id < paletteSize; ++id)
         {
             BlockState state = palette.getBlockState(id);
+            ReplacementRule rule = state != null ? ruleFor(rules, state) : null;
 
-            if (state != null && rule.matches(state))
+            if (rule != null)
             {
                 BlockStateMapper.MappingResult mapped = rule.map(state);
 
@@ -260,7 +341,7 @@ public final class SchematicReplacer
         }
     }
 
-    private static <T> List<BlockPos> matchingPositions(LitematicaBlockStateContainer container, Map<BlockPos, T> map, ReplacementRule rule)
+    private static <T> List<BlockPos> matchingPositions(LitematicaBlockStateContainer container, Map<BlockPos, T> map, List<ReplacementRule> rules)
     {
         List<BlockPos> list = new ArrayList<>();
 
@@ -268,7 +349,7 @@ public final class SchematicReplacer
         {
             for (BlockPos pos : map.keySet())
             {
-                if (rule.matches(container.get(pos.getX(), pos.getY(), pos.getZ())))
+                if (ruleFor(rules, container.get(pos.getX(), pos.getY(), pos.getZ())) != null)
                 {
                     list.add(pos);
                 }
@@ -276,6 +357,20 @@ public final class SchematicReplacer
         }
 
         return list;
+    }
+
+    @Nullable
+    private static ReplacementRule ruleFor(List<ReplacementRule> rules, BlockState state)
+    {
+        for (ReplacementRule rule : rules)
+        {
+            if (rule.matches(state))
+            {
+                return rule;
+            }
+        }
+
+        return null;
     }
 
     private static int airDelta(BlockState oldState, BlockState newState)

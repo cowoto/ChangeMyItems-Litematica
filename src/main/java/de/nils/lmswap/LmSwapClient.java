@@ -7,7 +7,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import de.nils.lmswap.core.RebuildWatcher;
-import de.nils.lmswap.debug.DebugCommands;
 
 public class LmSwapClient implements ClientModInitializer
 {
@@ -22,12 +21,6 @@ public class LmSwapClient implements ClientModInitializer
                 .orElse("unknown");
 
         ClientTickEvents.END_CLIENT_TICK.register(RebuildWatcher.INSTANCE::onClientTick);
-
-        if (FabricLoader.getInstance().isDevelopmentEnvironment())
-        {
-            DebugCommands.register();
-            LOGGER.info("[lmswap] Debug command /lmswap-debug registered (development environment)");
-        }
 
         LOGGER.info("[lmswap] Litematica Material Swap {} initialized", version);
     }

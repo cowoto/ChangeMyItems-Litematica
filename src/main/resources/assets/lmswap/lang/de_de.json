@@ -10,7 +10,21 @@
 	"lmswap.error.no_world": "Keine Welt geladen",
 	"lmswap.error.no_placement_selected": "Kein Schematic-Placement ausgewählt",
 	"lmswap.warning.shared_schematic": "Achtung: %s Placements nutzen diese Schematic, die Ersetzung wirkt auf alle",
-	"lmswap.debug.confirm_hint": "Mit %s trotzdem ersetzen",
 	"lmswap.info.replaced_total": "%s Blöcke in '%s' ersetzt",
-	"lmswap.info.replaced_region": "  Region '%s': %s"
+	"lmswap.info.replaced_region": "  Region '%s': %s",
+	"lmswap.gui.button.material_list.replace.hover": "Dieses Material in der Schematic durch einen anderen Block ersetzen",
+	"lmswap.gui.title.replace_material": "Material ersetzen",
+	"lmswap.gui.label.source": "Quelle: %s (%s Blöcke in der Schematic, alle Regionen)",
+	"lmswap.gui.label.target_air": "Luft (Material entfernen)",
+	"lmswap.gui.label.select_target": "Zielblock in der Liste auswählen",
+	"lmswap.gui.label.preview": "%s Blöcke werden ersetzt: %s → %s",
+	"lmswap.gui.checkbox.keep_properties": "Block-Properties übernehmen",
+	"lmswap.gui.checkbox.keep_properties.hover": "Übernimmt z. B. Slab-Typ, waterlogged, Treppen-Ausrichtung/-Hälfte/-Form",
+	"lmswap.gui.button.replace_confirm": "Ersetzen",
+	"lmswap.gui.button.cancel": "Abbrechen",
+	"lmswap.error.nothing_to_replace": "Keine Blöcke dieses Materials in der Schematic gefunden",
+	"lmswap.warning.property_lost": "Property '%s' geht verloren",
+	"lmswap.warning.properties_reset": "Block-Properties werden auf die Standardwerte des Ziels gesetzt",
+	"lmswap.warning.block_entity_data_lost": "Block-Entity-Daten (z. B. Inhalte von Behältern) werden entfernt",
+	"lmswap.warning.material_removed": "Das Material wird aus der Schematic entfernt"
 }

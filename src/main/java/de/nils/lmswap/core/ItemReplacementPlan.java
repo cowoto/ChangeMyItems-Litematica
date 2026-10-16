@@ -1,0 +1,202 @@
+package de.nils.lmswap.core;
+
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
+import java.util.List;
+import java.util.Set;
+
+import javax.annotation.Nullable;
+
+import fi.dy.masa.litematica.materials.MaterialCache;
+import fi.dy.masa.litematica.schematic.LitematicaSchematic;
+import fi.dy.masa.litematica.schematic.container.ILitematicaBlockStatePalette;
+import fi.dy.masa.litematica.schematic.container.LitematicaBlockStateContainer;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
+
+import de.nils.lmswap.core.ReplacementResult.Message;
+
+/**
+ * Translates a material list entry (an item, see docs/DECISIONS.md decision 1) into the block states of a
+ * schematic that need that item, and builds the replacement rules for a chosen target block.
+ * <p>
+ * A state belongs to the item if Litematica's {@link MaterialCache} names it as the build item, using the same
+ * rules as the material list (waterlogged states count as their dry state). States that need several items
+ * (potted plants) are skipped, replacing them would also remove the other item.
+ */
+public final class ItemReplacementPlan
+{
+    private final LitematicaSchematic schematic;
+    private final Item item;
+    private final List<BlockState> sourceStates;
+    private final Set<Block> sourceBlocks;
+    private final int blockCount;
+
+    private ItemReplacementPlan(LitematicaSchematic schematic, Item item, List<BlockState> sourceStates)
+    {
+        this.schematic = schematic;
+        this.item = item;
+        this.sourceStates = List.copyOf(sourceStates);
+        this.sourceBlocks = new LinkedHashSet<>();
+        sourceStates.forEach(state -> this.sourceBlocks.add(state.getBlock()));
+        this.blockCount = SchematicReplacer.countMatching(schematic, this.rulesFor(null, true));
+    }
+
+    public static ItemReplacementPlan forItem(LitematicaSchematic schematic, Item item)
+    {
+        MaterialCache cache = MaterialCache.getInstance();
+        Set<BlockState> states = new LinkedHashSet<>();
+
+        for (String regionName : schematic.getAreas().keySet())
+        {
+            LitematicaBlockStateContainer container = schematic.getSubRegionContainer(regionName);
+
+            if (container == null)
+            {
+                continue;
+            }
+
+            ILitematicaBlockStatePalette palette = container.getPalette();
+
+            for (int id = 0; id < palette.getPaletteSize(); ++id)
+            {
+                BlockState state = palette.getBlockState(id);
+
+                if (state != null && state.isAir() == false && states.contains(state) == false
+                    && cache.requiresMultipleItems(state) == false)
+                {
+                    ItemStack stack = cache.getRequiredBuildItemForState(dryState(state));
+
+                    if (stack.isEmpty() == false && stack.getItem() == item)
+                    {
+                        states.add(state);
+                    }
+                }
+            }
+        }
+
+        return new ItemReplacementPlan(schematic, item, new ArrayList<>(states));
+    }
+
+    public LitematicaSchematic getSchematic()
+    {
+        return this.schematic;
+    }
+
+    public Item getItem()
+    {
+        return this.item;
+    }
+
+    public boolean isEmpty()
+    {
+        return this.sourceStates.isEmpty();
+    }
+
+    public Set<Block> getSourceBlocks()
+    {
+        return this.sourceBlocks;
+    }
+
+    /** Number of blocks in all regions of the schematic that would be replaced */
+    public int getBlockCount()
+    {
+        return this.blockCount;
+    }
+
+    /**
+     * Decision 3 (strict): the target must define the same properties as every source block. Air is always allowed.
+     */
+    public boolean isAllowedTarget(Block target)
+    {
+        if (target.defaultBlockState().isAir())
+        {
+            return true;
+        }
+
+        if (this.sourceBlocks.contains(target))
+        {
+            return false;
+        }
+
+        for (Block source : this.sourceBlocks)
+        {
+            if (BlockStateMapper.haveSameProperties(source, target) == false)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
+    /**
+     * @param target null only for counting (the target is irrelevant for matching)
+     */
+    public List<ReplacementRule> rulesFor(@Nullable Block target, boolean keepProperties)
+    {
+        Block t = target != null ? target : Blocks.AIR;
+        List<ReplacementRule> rules = new ArrayList<>(this.sourceStates.size());
+
+        for (BlockState state : this.sourceStates)
+        {
+            rules.add(ReplacementRule.ofState(state, t).withKeepProperties(keepProperties));
+        }
+
+        return rules;
+    }
+
+    /**
+     * Warnings shown before replacing, derived from {@link BlockStateMapper} without changing anything.
+     */
+    public List<Message> previewWarnings(Block target, boolean keepProperties)
+    {
+        Set<Message> warnings = new LinkedHashSet<>();
+        boolean targetIsAir = target.defaultBlockState().isAir();
+        boolean targetHasBlockEntity = target.defaultBlockState().hasBlockEntity();
+
+        if (targetIsAir)
+        {
+            warnings.add(Message.of("lmswap.warning.material_removed"));
+        }
+
+        for (BlockState state : this.sourceStates)
+        {
+            if (targetIsAir == false)
+            {
+                if (keepProperties)
+                {
+                    for (String property : BlockStateMapper.map(state, target).droppedProperties())
+                    {
+                        warnings.add(Message.of("lmswap.warning.property_lost", property));
+                    }
+                }
+                else if (state.getProperties().isEmpty() == false)
+                {
+                    warnings.add(Message.of("lmswap.warning.properties_reset"));
+                }
+            }
+
+            if (state.hasBlockEntity() && targetHasBlockEntity == false)
+            {
+                warnings.add(Message.of("lmswap.warning.block_entity_data_lost"));
+            }
+        }
+
+        return List.copyOf(warnings);
+    }
+
+    private static BlockState dryState(BlockState state)
+    {
+        if (state.hasProperty(BlockStateProperties.WATERLOGGED) && state.getValue(BlockStateProperties.WATERLOGGED))
+        {
+            return state.setValue(BlockStateProperties.WATERLOGGED, false);
+        }
+
+        return state;
+    }
+}
