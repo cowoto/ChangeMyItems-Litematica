@@ -220,6 +220,16 @@ public final class ItemReplacementPlan
      */
     public List<Message> previewWarnings(Block target, boolean keepProperties)
     {
+        return this.previewWarnings(target, keepProperties, List.of(), Map.of());
+    }
+
+    /**
+     * Warnings for the states that pass the conditions, with the overrides applied (e.g. waterlogged=true keeps the
+     * water even if properties are not kept).
+     */
+    public List<Message> previewWarnings(Block target, boolean keepProperties, List<PropertyCondition> conditions,
+                                         Map<String, String> overrides)
+    {
         Set<Message> warnings = new LinkedHashSet<>();
         boolean targetIsAir = target.defaultBlockState().isAir();
         boolean targetHasBlockEntity = target.defaultBlockState().hasBlockEntity();
@@ -231,6 +241,11 @@ public final class ItemReplacementPlan
 
         for (BlockState state : this.sourceStates)
         {
+            if (conditions.stream().allMatch(c -> c.matches(state)) == false)
+            {
+                continue;
+            }
+
             if (targetIsAir == false)
             {
                 if (keepProperties)
@@ -253,7 +268,8 @@ public final class ItemReplacementPlan
 
             if (targetIsAir == false && isWaterlogged(state))
             {
-                BlockState mapped = keepProperties ? BlockStateMapper.map(state, target).state() : target.defaultBlockState();
+                BlockState mapped = ReplacementRule.ofState(state, target).withKeepProperties(keepProperties)
+                                                   .withOverrides(overrides).map(state).state();
 
                 if (isWaterlogged(mapped) == false)
                 {
@@ -263,6 +279,68 @@ public final class ItemReplacementPlan
         }
 
         return List.copyOf(warnings);
+    }
+
+    /**
+     * Properties of the source blocks with all their possible value names, for the filter GUI. With several source
+     * blocks (torch / wall torch) this is the union.
+     */
+    public Map<String, List<String>> sourceProperties()
+    {
+        Map<String, List<String>> properties = new java.util.LinkedHashMap<>();
+
+        for (Block block : this.sourceBlocks)
+        {
+            for (net.minecraft.world.level.block.state.properties.Property<?> prop : block.getStateDefinition().getProperties())
+            {
+                List<String> values = properties.computeIfAbsent(prop.getName(), k -> new ArrayList<>());
+
+                for (String value : valueNames(prop))
+                {
+                    if (values.contains(value) == false)
+                    {
+                        values.add(value);
+                    }
+                }
+            }
+        }
+
+        return properties;
+    }
+
+    private static <T extends Comparable<T>> List<String> valueNames(net.minecraft.world.level.block.state.properties.Property<T> prop)
+    {
+        return prop.getPossibleValues().stream().map(prop::getName).toList();
+    }
+
+    /**
+     * Blocks per source state in the scope; filter counts are sums over this map.
+     */
+    public Map<BlockState, Integer> stateCounts(Scope scope, @Nullable fi.dy.masa.litematica.schematic.placement.SchematicPlacement placement)
+    {
+        return SchematicReplacer.countPerState(this.schematic, this.rulesFor(null, true, List.of(), Map.of(), scope), placement);
+    }
+
+    /** Sum of the counts of the states that pass all conditions */
+    public static int filteredCount(Map<BlockState, Integer> stateCounts, List<PropertyCondition> conditions)
+    {
+        int sum = 0;
+
+        for (Map.Entry<BlockState, Integer> e : stateCounts.entrySet())
+        {
+            if (conditions.stream().allMatch(c -> c.matches(e.getKey())))
+            {
+                sum += e.getValue();
+            }
+        }
+
+        return sum;
+    }
+
+    /** Count of blocks having {@code property=value}, regardless of other filters */
+    public static int valueCount(Map<BlockState, Integer> stateCounts, String property, String value)
+    {
+        return filteredCount(stateCounts, List.of(PropertyCondition.of(property, value)));
     }
 
     private static boolean isWaterlogged(BlockState state)

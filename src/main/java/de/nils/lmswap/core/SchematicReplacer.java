@@ -248,6 +248,49 @@ public final class SchematicReplacer
         return count(container, Compiled.of(container, rules, wholeParts(rules.size()), null));
     }
 
+    /**
+     * Like {@link #countMatching} but per original block state, for live previews of filters: once counted, any
+     * filter combination is just a sum over this map.
+     *
+     * @return empty if a scope can not be resolved
+     */
+    public static Map<BlockState, Integer> countPerState(LitematicaSchematic schematic, List<ReplacementRule> rules,
+                                                         @Nullable SchematicPlacement placement)
+    {
+        ResolvedScope[] scopes = resolveScopes(schematic, rules, placement);
+        Map<BlockState, Integer> counts = new HashMap<>();
+
+        if (scopes == null)
+        {
+            return counts;
+        }
+
+        for (String regionName : schematic.getAreas().keySet())
+        {
+            LitematicaBlockStateContainer container = schematic.getSubRegionContainer(regionName);
+            RegionPart[] parts = partsFor(scopes, regionName);
+
+            if (container == null || parts == null)
+            {
+                continue;
+            }
+
+            Compiled compiled = Compiled.of(container, rules, parts, null);
+            int[] perId = new int[compiled.paletteSize];
+            count(container, compiled, perId);
+
+            for (int id = 0; id < perId.length; ++id)
+            {
+                if (perId[id] > 0)
+                {
+                    counts.merge(compiled.oldStates[id], perId[id], Integer::sum);
+                }
+            }
+        }
+
+        return counts;
+    }
+
     static ContainerChange replaceInContainer(LitematicaBlockStateContainer container, ReplacementRule rule, Set<Message> warnings)
     {
         return replaceInContainer(container, List.of(rule), warnings);
@@ -348,6 +391,14 @@ public final class SchematicReplacer
 
     private static int count(LitematicaBlockStateContainer container, Compiled compiled)
     {
+        return count(container, compiled, null);
+    }
+
+    /**
+     * @param perId if not null, receives the count per palette id
+     */
+    private static int count(LitematicaBlockStateContainer container, Compiled compiled, @Nullable int[] perId)
+    {
         if (compiled.anyMatch == false)
         {
             return 0;
@@ -364,9 +415,16 @@ public final class SchematicReplacer
             {
                 for (int x = 0; x < size.getX(); ++x, ++index)
                 {
-                    if (compiled.candidateAt(storage.getAt(index), x, y, z) >= 0)
+                    int id = storage.getAt(index);
+
+                    if (compiled.candidateAt(id, x, y, z) >= 0)
                     {
                         ++count;
+
+                        if (perId != null)
+                        {
+                            ++perId[id];
+                        }
                     }
                 }
             }

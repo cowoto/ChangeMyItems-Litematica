@@ -82,5 +82,17 @@
 	"lmswap.gui.scope.selection_unavailable.no_selection": "There is no area selection with a complete box",
 	"lmswap.gui.scope.selection_unavailable.no_intersection": "The area selection does not intersect this placement",
 	"lmswap.gui.label.scope_empty": "No blocks of this material in the chosen area",
-	"lmswap.warning.selection_shared": "%s placements use this schematic: the corresponding blocks change in all of them"
+	"lmswap.warning.selection_shared": "%s placements use this schematic: the corresponding blocks change in all of them",
+	"lmswap.gui.button.section_filter": "Filter (%s active)",
+	"lmswap.gui.button.section_filter.hover": "Only replace blocks whose properties have the selected values (counts per value in the chosen area)",
+	"lmswap.gui.button.section_overrides": "Fixed target properties (%s)",
+	"lmswap.gui.button.section_overrides.hover": "Always set these properties on every replaced block, regardless of the source",
+	"lmswap.gui.button.filter_all": "all",
+	"lmswap.gui.button.filter_none": "none",
+	"lmswap.gui.button.override_keep": "unchanged",
+	"lmswap.gui.label.filter_no_properties": "The source block has no properties",
+	"lmswap.gui.label.overrides_select_target": "Select a target block first",
+	"lmswap.gui.label.overrides_no_properties": "The target block has no properties",
+	"lmswap.gui.label.select_target_count": "%s blocks match - select a target block from the list",
+	"lmswap.gui.label.scope_regions_short": "Regions: %s"
 }

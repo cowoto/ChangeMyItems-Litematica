@@ -2,8 +2,10 @@ package de.nils.lmswap.gui;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -26,30 +28,43 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.Property;
 
 import de.nils.lmswap.config.Configs;
 import de.nils.lmswap.core.ItemReplacementPlan;
 import de.nils.lmswap.core.MaterialSwapService;
+import de.nils.lmswap.core.PropertyCondition;
 import de.nils.lmswap.core.ReplacementResult;
 import de.nils.lmswap.core.ReplacementRule;
-import de.nils.lmswap.core.SchematicReplacer;
 import de.nils.lmswap.core.Scope;
 import de.nils.lmswap.core.SelectionScopes;
-import de.nils.lmswap.data.SavedScope;
 import de.nils.lmswap.data.RuleStore;
 import de.nils.lmswap.data.SavedRule;
+import de.nils.lmswap.data.SavedScope;
 
 /**
  * "Replace material" screen, opened from a material list row.
- * Source on top, searchable target list, options, preview and the replace/cancel buttons at the bottom.
+ * <ul>
+ *   <li>Top: source material with icon and count.</li>
+ *   <li>Left: searchable target list; below it the options, the collapsible "Filter" and "Fixed target properties"
+ *       sections (part C), the live preview and the replace/cancel buttons.</li>
+ *   <li>Right: area switcher (part B) and the saved rules.</li>
+ * </ul>
+ * Counting: the blocks per source state in the chosen area are counted once (one pass over the schematic) whenever
+ * the area changes. Filter changes only sum those counts, so the preview updates instantly even for large schematics.
  */
 public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEntry, WidgetListReplaceTargets>
                                 implements ISelectionListener<Block>
 {
     private static final int LIST_Y = 50;
-    private static final int BOTTOM_AREA_HEIGHT = 110;
+    /** keep-properties row, remember row, section toggles, preview (4 lines), buttons */
+    private static final int FIXED_BOTTOM_HEIGHT = 14 + 16 + 18 + 50 + 30;
     private static final int RULES_PANEL_WIDTH = 230;
     private static final int RULE_ROW_HEIGHT = 14;
+    private static final int CHIP_HEIGHT = 14;
+    private static final int CHIP_ROW_HEIGHT = 15;
+    private static final int SECTION_LABEL_WIDTH = 90;
 
     private final ReplaceContext context;
     private final MaterialListEntry entry;
@@ -61,14 +76,23 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
     private boolean rememberGlobal;
     @Nullable private Block selected;
 
-    /** Part B: where to replace */
+    // Part B: where to replace
     private ScopeMode scopeMode = ScopeMode.WHOLE;
     private final List<String> regionNames;
     private final Set<String> selectedRegions;
     private SelectionScopes.Availability selectionAvailability;
     @Nullable private Scope.WorldBoxes selectionBoxes;
-    /** Blocks the replacement would hit in the current scope */
-    private int scopedCount;
+
+    // Part C: filter and overrides
+    private final Map<String, List<String>> sourceProperties;
+    /** property -> selected values; all values selected = no condition for that property */
+    private final Map<String, Set<String>> filterSelection = new LinkedHashMap<>();
+    /** fixed target properties (only properties/values the selected target has) */
+    private final Map<String, String> overrides = new LinkedHashMap<>();
+    private boolean filterExpanded;
+    private boolean overridesExpanded;
+    private Map<BlockState, Integer> stateCounts = Map.of();
+    private int previewY;
 
     private enum ScopeMode
     {
@@ -82,6 +106,11 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         {
             this.translationKey = translationKey;
         }
+    }
+
+    /** A small toggle button in a flowing row */
+    private record Chip(String text, Runnable action)
+    {
     }
 
     public GuiMaterialReplace(ReplaceContext context, MaterialListEntry entry)
@@ -99,9 +128,70 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         this.regionNames = new ArrayList<>(context.schematic().getAreas().keySet());
         this.regionNames.sort(String.CASE_INSENSITIVE_ORDER);
         this.selectedRegions = new LinkedHashSet<>(this.regionNames);
+
+        this.sourceProperties = this.plan.sourceProperties();
+        this.sourceProperties.forEach((property, values) -> this.filterSelection.put(property, new LinkedHashSet<>(values)));
+
         this.refreshSelection();
-        this.updateCount();
+        this.recount();
     }
+
+    // ---- targets ----
+
+    /**
+     * Fills {@link #targets} in place; the list widget holds a reference to it.
+     */
+    private void collectTargets()
+    {
+        this.targets.clear();
+
+        for (Block block : BuiltInRegistries.BLOCK)
+        {
+            if (block.asItem() != Items.AIR && this.plan.isAllowedTarget(block, this.keepProperties))
+            {
+                this.targets.add(block);
+            }
+        }
+
+        this.targets.sort(Comparator.comparing(WidgetReplaceTargetEntry::displayName, String.CASE_INSENSITIVE_ORDER));
+        this.targets.addFirst(Blocks.AIR);
+    }
+
+    private void onKeepPropertiesChanged(boolean keepProperties)
+    {
+        this.keepProperties = keepProperties;
+        this.collectTargets();
+
+        WidgetListReplaceTargets list = this.getListWidget();
+
+        if (this.selected != null && this.targets.contains(this.selected) == false)
+        {
+            this.selected = null;
+            this.overrides.clear();
+
+            if (list != null)
+            {
+                list.clearSelection();
+            }
+        }
+
+        if (list != null)
+        {
+            list.refreshEntries();
+        }
+
+        this.initGui();
+    }
+
+    @Override
+    public void onSelectionChange(@Nullable Block block)
+    {
+        this.selected = block;
+        this.pruneOverrides();
+        this.initGui();
+    }
+
+    // ---- scope (part B) ----
 
     private void refreshSelection()
     {
@@ -135,22 +225,11 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         };
     }
 
-    private List<ReplacementRule> currentRules(@Nullable Block target)
-    {
-        return this.plan.rulesFor(target, this.keepProperties, List.of(), Map.of(), this.currentScope());
-    }
-
-    private void updateCount()
-    {
-        int count = SchematicReplacer.countMatching(this.context.schematic(), this.currentRules(null), this.context.placement());
-        this.scopedCount = Math.max(0, count);
-    }
-
     private void setScopeMode(ScopeMode mode)
     {
         this.scopeMode = mode;
         this.refreshSelection();
-        this.updateCount();
+        this.recount();
         this.initGui();
     }
 
@@ -165,54 +244,118 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
             this.selectedRegions.remove(region);
         }
 
-        this.updateCount();
+        this.recount();
         this.initGui();
     }
 
-    /**
-     * Fills {@link #targets} in place; the list widget holds a reference to it.
-     */
-    private void collectTargets()
+    /** One pass over the schematic: blocks per source state in the current scope */
+    private void recount()
     {
-        this.targets.clear();
-
-        for (Block block : BuiltInRegistries.BLOCK)
-        {
-            if (block.asItem() != Items.AIR && this.plan.isAllowedTarget(block, this.keepProperties))
-            {
-                this.targets.add(block);
-            }
-        }
-
-        this.targets.sort(Comparator.comparing(WidgetReplaceTargetEntry::displayName, String.CASE_INSENSITIVE_ORDER));
-        this.targets.addFirst(Blocks.AIR);
+        this.stateCounts = this.plan.stateCounts(this.currentScope(), this.context.placement());
     }
 
-    private void onKeepPropertiesChanged(boolean keepProperties)
+    // ---- filter and overrides (part C) ----
+
+    private List<PropertyCondition> currentConditions()
     {
-        this.keepProperties = keepProperties;
-        this.collectTargets();
+        List<PropertyCondition> conditions = new ArrayList<>();
 
-        WidgetListReplaceTargets list = this.getListWidget();
-
-        if (this.selected != null && this.targets.contains(this.selected) == false)
-        {
-            this.selected = null;
-
-            if (list != null)
+        this.filterSelection.forEach((property, values) -> {
+            if (values.size() != this.sourceProperties.get(property).size())
             {
-                list.clearSelection();
+                conditions.add(new PropertyCondition(property, values));
+            }
+        });
+
+        return conditions;
+    }
+
+    @Nullable
+    private ReplacementResult.Message filterError()
+    {
+        for (Map.Entry<String, Set<String>> e : this.filterSelection.entrySet())
+        {
+            if (e.getValue().isEmpty())
+            {
+                return ReplacementResult.Message.of("lmswap.error.filter_no_values", e.getKey());
             }
         }
 
-        if (list != null)
+        return this.plan.validateConditions(this.currentConditions());
+    }
+
+    private int filteredCount()
+    {
+        return this.filterError() != null ? 0 : ItemReplacementPlan.filteredCount(this.stateCounts, this.currentConditions());
+    }
+
+    private void toggleFilterValue(String property, String value)
+    {
+        Set<String> values = this.filterSelection.get(property);
+
+        if (values.remove(value) == false)
         {
-            list.refreshEntries();
+            values.add(value);
         }
 
-        this.updateCount();
         this.initGui();
     }
+
+    private void setFilterAll(String property, boolean all)
+    {
+        Set<String> values = this.filterSelection.get(property);
+        values.clear();
+
+        if (all)
+        {
+            values.addAll(this.sourceProperties.get(property));
+        }
+
+        this.initGui();
+    }
+
+    private void setOverride(String property, @Nullable String value)
+    {
+        if (value == null)
+        {
+            this.overrides.remove(property);
+        }
+        else
+        {
+            this.overrides.put(property, value);
+        }
+
+        this.initGui();
+    }
+
+    /** Keeps only overrides the selected target block actually has */
+    private void pruneOverrides()
+    {
+        Block target = this.selected;
+
+        if (target == null || target.defaultBlockState().isAir())
+        {
+            this.overrides.clear();
+            return;
+        }
+
+        this.overrides.entrySet().removeIf(e -> {
+            Property<?> prop = target.getStateDefinition().getProperty(e.getKey());
+            return prop == null || prop.getValue(e.getValue()).isEmpty();
+        });
+    }
+
+    private Map<String, String> effectiveOverrides()
+    {
+        return this.selected == null || this.selected.defaultBlockState().isAir() ? Map.of() : Map.copyOf(this.overrides);
+    }
+
+    private List<ReplacementRule> currentRules(Block target)
+    {
+        return this.plan.rulesFor(target, this.keepProperties, this.currentConditions(), this.effectiveOverrides(), this.currentScope());
+    }
+
+    // ---- layout ----
 
     @Override
     protected int getBrowserWidth()
@@ -223,20 +366,13 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
     @Override
     protected int getBrowserHeight()
     {
-        return Math.max(60, this.getScreenHeight() - LIST_Y - BOTTOM_AREA_HEIGHT);
+        return Math.max(60, this.getScreenHeight() - LIST_Y - FIXED_BOTTOM_HEIGHT - this.layoutSections(0, false));
     }
 
     @Override
     protected WidgetListReplaceTargets createListWidget(int listX, int listY)
     {
         return new WidgetListReplaceTargets(listX, listY, this.getBrowserWidth(), this.getBrowserHeight(), this.targets, this);
-    }
-
-    @Override
-    public void onSelectionChange(@Nullable Block block)
-    {
-        this.selected = block;
-        this.initGui();
     }
 
     @Override
@@ -279,6 +415,25 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         rememberGlobal.setListener(cb -> this.rememberGlobal = cb.isChecked());
         this.addWidget(rememberGlobal);
 
+        // Section toggles
+        y += 16;
+        int activeFilters = this.currentConditions().size();
+        String filterLabel = (this.filterExpanded ? "▾ " : "▸ ") + StringUtils.translate("lmswap.gui.button.section_filter", activeFilters);
+        ButtonGeneric filterToggle = new ButtonGeneric(12, y, this.getStringWidth(filterLabel) + 10, 16, filterLabel,
+                                                       StringUtils.translate("lmswap.gui.button.section_filter.hover"));
+        this.addButton(filterToggle, (b, m) -> { this.filterExpanded = ! this.filterExpanded; this.initGui(); });
+
+        String overrideLabel = (this.overridesExpanded ? "▾ " : "▸ ")
+                               + StringUtils.translate("lmswap.gui.button.section_overrides", this.effectiveOverrides().size());
+        ButtonGeneric overrideToggle = new ButtonGeneric(filterToggle.getX() + filterToggle.getWidth() + 4, y,
+                                                         this.getStringWidth(overrideLabel) + 10, 16, overrideLabel,
+                                                         StringUtils.translate("lmswap.gui.button.section_overrides.hover"));
+        this.addButton(overrideToggle, (b, m) -> { this.overridesExpanded = ! this.overridesExpanded; this.initGui(); });
+
+        y += 18;
+        y = this.layoutSections(y, true);
+        this.previewY = y + 2;
+
         int panelY = this.createScopePanel();
         this.createRulesPanel(panelY);
 
@@ -287,13 +442,135 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         this.addButton(cancel, (button, mouseButton) -> this.closeGui(true));
 
         ButtonGeneric replace = new ButtonGeneric(cancel.getX() - 4, buttonY, -1, true, "lmswap.gui.button.replace_confirm");
-        replace.setEnabled(this.selected != null && this.scopedCount > 0);
+        replace.setEnabled(this.selected != null && this.filteredCount() > 0);
         this.addButton(replace, (button, mouseButton) -> this.replace());
 
         // Decision 4: replacements live only in memory until saved as a new schematic
         String notice = StringUtils.translate("lmswap.gui.label.not_saved_notice");
         int noticeWidth = Math.min(this.getStringWidth(notice), replace.getX() - 20);
         this.addLabel(12, buttonY + 6, noticeWidth, 10, 0xFFE0C060, notice);
+    }
+
+    /**
+     * Lays out the expanded filter and override sections. With {@code create == false} it only measures.
+     *
+     * @return the y position below the sections (the height, when called with y = 0)
+     */
+    private int layoutSections(int y, boolean create)
+    {
+        if (this.filterExpanded)
+        {
+            if (this.sourceProperties.isEmpty())
+            {
+                y = this.textRow(y, StringUtils.translate("lmswap.gui.label.filter_no_properties"), create);
+            }
+
+            for (Map.Entry<String, List<String>> e : this.sourceProperties.entrySet())
+            {
+                String property = e.getKey();
+                Set<String> selectedValues = this.filterSelection.get(property);
+                List<Chip> chips = new ArrayList<>();
+                boolean all = selectedValues.size() == e.getValue().size();
+
+                chips.add(new Chip(StringUtils.translate(all ? "lmswap.gui.button.filter_none" : "lmswap.gui.button.filter_all"),
+                                   () -> this.setFilterAll(property, all == false)));
+
+                for (String value : e.getValue())
+                {
+                    int count = ItemReplacementPlan.valueCount(this.stateCounts, property, value);
+                    boolean on = selectedValues.contains(value);
+                    String text = (on ? GuiBase.TXT_GREEN + "✔ " : GuiBase.TXT_GRAY) + value + " (" + count + ")";
+                    chips.add(new Chip(text, () -> this.toggleFilterValue(property, value)));
+                }
+
+                y = this.chipRow(y, property + ":", chips, create);
+            }
+        }
+
+        if (this.overridesExpanded)
+        {
+            Block target = this.selected;
+
+            if (target == null || target.defaultBlockState().isAir())
+            {
+                y = this.textRow(y, StringUtils.translate("lmswap.gui.label.overrides_select_target"), create);
+            }
+            else if (target.getStateDefinition().getProperties().isEmpty())
+            {
+                y = this.textRow(y, StringUtils.translate("lmswap.gui.label.overrides_no_properties"), create);
+            }
+            else
+            {
+                for (Property<?> prop : target.getStateDefinition().getProperties())
+                {
+                    String property = prop.getName();
+                    String current = this.overrides.get(property);
+                    List<Chip> chips = new ArrayList<>();
+                    chips.add(new Chip((current == null ? GuiBase.TXT_GREEN + "✔ " : GuiBase.TXT_GRAY)
+                                       + StringUtils.translate("lmswap.gui.button.override_keep"), () -> this.setOverride(property, null)));
+
+                    for (String value : valueNames(prop))
+                    {
+                        boolean on = value.equals(current);
+                        chips.add(new Chip((on ? GuiBase.TXT_GREEN + "✔ " : GuiBase.TXT_GRAY) + value,
+                                           () -> this.setOverride(property, value)));
+                    }
+
+                    y = this.chipRow(y, property + ":", chips, create);
+                }
+            }
+        }
+
+        return y;
+    }
+
+    private static <T extends Comparable<T>> List<String> valueNames(Property<T> prop)
+    {
+        return prop.getPossibleValues().stream().map(prop::getName).toList();
+    }
+
+    private int textRow(int y, String text, boolean create)
+    {
+        if (create)
+        {
+            this.addLabel(14, y + 3, this.getStringWidth(text), 10, 0xFFA0A0A0, text);
+        }
+
+        return y + CHIP_ROW_HEIGHT;
+    }
+
+    private int chipRow(int y, String label, List<Chip> chips, boolean create)
+    {
+        int x0 = 14 + SECTION_LABEL_WIDTH;
+        int maxX = this.getScreenWidth() - 12;
+        int x = x0;
+
+        if (create)
+        {
+            this.addLabel(14, y + 3, SECTION_LABEL_WIDTH - 4, 10, 0xFFFFFFFF,
+                          StringUtils.clampTextToRenderLength(label, SECTION_LABEL_WIDTH - 4, LeftRight.RIGHT, "..."));
+        }
+
+        for (Chip chip : chips)
+        {
+            int w = this.getStringWidth(chip.text()) + 8;
+
+            if (x + w > maxX && x > x0)
+            {
+                x = x0;
+                y += CHIP_ROW_HEIGHT;
+            }
+
+            if (create)
+            {
+                ButtonGeneric button = new ButtonGeneric(x, y, w, CHIP_HEIGHT, chip.text());
+                this.addButton(button, (b, m) -> chip.action().run());
+            }
+
+            x += w + 2;
+        }
+
+        return y + CHIP_ROW_HEIGHT + 2;
     }
 
     /**
@@ -320,7 +597,7 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
             if (mode == ScopeMode.SELECTION && this.selectionAvailability != SelectionScopes.Availability.AVAILABLE)
             {
                 button.setEnabled(false);
-                button.setHoverStrings("lmswap.gui.scope.selection_unavailable." + this.selectionAvailability.name().toLowerCase(java.util.Locale.ROOT));
+                button.setHoverStrings("lmswap.gui.scope.selection_unavailable." + this.selectionAvailability.name().toLowerCase(Locale.ROOT));
             }
             else if (mode == ScopeMode.SELECTION)
             {
@@ -398,9 +675,7 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
                                                      StringUtils.translate("lmswap.gui.button.rule_delete.hover"));
             this.addButton(delete, (button, mouseButton) -> this.deleteRule(rule, global));
 
-            String prefix = global ? GuiBase.TXT_GOLD + StringUtils.translate("lmswap.gui.label.rule_global") + " " + GuiBase.TXT_RST : "";
-            String suffix = rule.keepProperties() ? "" : " " + StringUtils.translate("lmswap.gui.label.rule_reset");
-            String text = prefix + rule.sourceName() + " → " + rule.targetName() + suffix;
+            String text = RuleTexts.describe(rule, global);
             this.addLabel(panelX + 18, y, width - 18, 10, 0xFFFFFFFF,
                           StringUtils.clampTextToRenderLength(text, width - 18, LeftRight.RIGHT, "..."));
             y += RULE_ROW_HEIGHT;
@@ -435,7 +710,7 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         }
 
         SavedRule rule = SavedRule.of(this.entry.getStack().getItem(), this.selected, this.keepProperties)
-                                  .withFilter(List.of(), Map.of(), this.currentSavedScope());
+                                  .withFilter(this.currentConditions(), this.effectiveOverrides(), this.currentSavedScope());
 
         if (this.rememberForSchematic)
         {
@@ -447,6 +722,8 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
             RuleStore.INSTANCE.putGlobal(rule);
         }
     }
+
+    // ---- drawing ----
 
     @Override
     public void drawContents(GuiContext ctx, int mouseX, int mouseY, float partialTicks)
@@ -478,7 +755,7 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
     private void drawPreview(GuiContext ctx)
     {
         int x = 12;
-        int y = LIST_Y + this.getBrowserHeight() + 34;
+        int y = this.previewY;
 
         if (this.plan.getBlockCount() == 0)
         {
@@ -486,7 +763,17 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
             return;
         }
 
-        if (this.scopedCount == 0)
+        ReplacementResult.Message error = this.filterError();
+
+        if (error != null)
+        {
+            this.drawString(ctx, GuiBase.TXT_RED + StringUtils.translate(error.translationKey(), error.args().toArray()), x, y, 0xFFFFFFFF);
+            return;
+        }
+
+        int count = this.filteredCount();
+
+        if (count == 0)
         {
             this.drawString(ctx, GuiBase.TXT_RED + StringUtils.translate("lmswap.gui.label.scope_empty"), x, y, 0xFFFFFFFF);
             return;
@@ -494,33 +781,47 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
 
         if (this.selected == null)
         {
-            this.drawString(ctx, GuiBase.TXT_GRAY + StringUtils.translate("lmswap.gui.label.select_target"), x, y, 0xFFFFFFFF);
+            this.drawString(ctx, GuiBase.TXT_GRAY + StringUtils.translate("lmswap.gui.label.select_target_count", count), x, y, 0xFFFFFFFF);
             return;
         }
 
-        String preview = StringUtils.translate("lmswap.gui.label.preview", this.scopedCount,
+        String preview = StringUtils.translate("lmswap.gui.label.preview", count,
                                                this.entry.getStack().getHoverName().getString(),
                                                WidgetReplaceTargetEntry.displayName(this.selected));
         this.drawString(ctx, preview, x, y, 0xFFFFFFFF);
 
-        List<ReplacementResult.Message> warnings = new ArrayList<>(this.plan.previewWarnings(this.selected, this.keepProperties));
+        List<ReplacementResult.Message> warnings = new ArrayList<>(this.plan.previewWarnings(this.selected, this.keepProperties,
+                                                                                             this.currentConditions(),
+                                                                                             this.effectiveOverrides()));
 
         if (this.scopeMode == ScopeMode.SELECTION && this.placementCount > 1)
         {
             warnings.add(ReplacementResult.Message.of("lmswap.warning.selection_shared", this.placementCount));
         }
 
-        for (ReplacementResult.Message warning : warnings)
+        int maxLines = 3;
+
+        for (int i = 0; i < warnings.size() && i < maxLines; ++i)
         {
+            ReplacementResult.Message warning = warnings.get(i);
             y += 11;
             this.drawString(ctx, GuiBase.TXT_GOLD + StringUtils.translate(warning.translationKey(), warning.args().toArray()),
                             x, y, 0xFFFFFFFF);
         }
+
+        if (warnings.size() > maxLines)
+        {
+            y += 11;
+            this.drawString(ctx, GuiBase.TXT_GOLD + StringUtils.translate("lmswap.gui.label.rules_more", warnings.size() - maxLines),
+                            x, y, 0xFFFFFFFF);
+        }
     }
+
+    // ---- action ----
 
     private void replace()
     {
-        if (this.selected == null)
+        if (this.selected == null || this.filterError() != null)
         {
             return;
         }

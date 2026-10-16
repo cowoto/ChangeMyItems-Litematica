@@ -82,5 +82,17 @@
 	"lmswap.gui.scope.selection_unavailable.no_selection": "Es gibt keine Bereichsauswahl mit vollständiger Box",
 	"lmswap.gui.scope.selection_unavailable.no_intersection": "Die Bereichsauswahl schneidet dieses Placement nicht",
 	"lmswap.gui.label.scope_empty": "Im gewählten Bereich gibt es keine Blöcke dieses Materials",
-	"lmswap.warning.selection_shared": "%s Placements nutzen diese Schematic: die entsprechenden Blöcke ändern sich in allen"
+	"lmswap.warning.selection_shared": "%s Placements nutzen diese Schematic: die entsprechenden Blöcke ändern sich in allen",
+	"lmswap.gui.button.section_filter": "Filter (%s aktiv)",
+	"lmswap.gui.button.section_filter.hover": "Nur Blöcke ersetzen, deren Properties die gewählten Werte haben (Anzahl je Wert im gewählten Bereich)",
+	"lmswap.gui.button.section_overrides": "Ziel-Properties fest setzen (%s)",
+	"lmswap.gui.button.section_overrides.hover": "Diese Properties werden bei jedem ersetzten Block fest gesetzt, unabhängig von der Quelle",
+	"lmswap.gui.button.filter_all": "alle",
+	"lmswap.gui.button.filter_none": "keine",
+	"lmswap.gui.button.override_keep": "unverändert",
+	"lmswap.gui.label.filter_no_properties": "Der Quellblock hat keine Properties",
+	"lmswap.gui.label.overrides_select_target": "Erst einen Zielblock auswählen",
+	"lmswap.gui.label.overrides_no_properties": "Der Zielblock hat keine Properties",
+	"lmswap.gui.label.select_target_count": "%s Blöcke passen – Zielblock in der Liste auswählen",
+	"lmswap.gui.label.scope_regions_short": "Regionen: %s"
 }
