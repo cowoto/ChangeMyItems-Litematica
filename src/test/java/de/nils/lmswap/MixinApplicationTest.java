@@ -40,4 +40,16 @@ class MixinApplicationTest
         assertTrue(Arrays.stream(clazz.getDeclaredMethods()).anyMatch(m -> m.getName().contains("lmswap$addReplaceButton")),
                    "Injected handler not found in WidgetMaterialListEntry");
     }
+
+    @Test
+    void materialListButtonsAndReloadHookAreApplied() throws ClassNotFoundException
+    {
+        assertTrue(hasHandler("fi.dy.masa.litematica.gui.GuiMaterialList", "lmswap$addButtons"));
+        assertTrue(hasHandler("fi.dy.masa.litematica.schematic.LitematicaSchematic", "lmswap$clearHistoryOnReload"));
+    }
+
+    private static boolean hasHandler(String className, String handler) throws ClassNotFoundException
+    {
+        return Arrays.stream(load(className).getDeclaredMethods()).anyMatch(m -> m.getName().contains(handler));
+    }
 }

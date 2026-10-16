@@ -133,6 +133,44 @@ class SchematicReplacerContainerTest
     }
 
     @Test
+    void twoReplacementsUndoneInReverseOrderRestoreEveryPosition()
+    {
+        LitematicaBlockStateContainer container = new LitematicaBlockStateContainer(5, 4, 3);
+        BlockState[] palette = {
+                Blocks.AIR.defaultBlockState(),
+                Blocks.SMOOTH_STONE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.TOP),
+                Blocks.SMOOTH_STONE_SLAB.defaultBlockState().setValue(SlabBlock.TYPE, SlabType.BOTTOM),
+                Blocks.STONE_SLAB.defaultBlockState(),   // target state already present before the first replacement
+                Blocks.DIRT.defaultBlockState() };
+        BlockState[][][] before = new BlockState[5][4][3];
+
+        for (int x = 0; x < 5; ++x)
+            for (int y = 0; y < 4; ++y)
+                for (int z = 0; z < 3; ++z)
+                {
+                    BlockState state = palette[(x * 7 + y * 3 + z) % palette.length];
+                    container.set(x, y, z, state);
+                    before[x][y][z] = state;
+                }
+
+        SchematicReplacer.ContainerChange first = SchematicReplacer.replaceInContainer(
+                container, ReplacementRule.ofBlock(Blocks.SMOOTH_STONE_SLAB, Blocks.STONE_SLAB), new LinkedHashSet<>());
+        SchematicReplacer.ContainerChange second = SchematicReplacer.replaceInContainer(
+                container, ReplacementRule.ofBlock(Blocks.STONE_SLAB, Blocks.OAK_SLAB), new LinkedHashSet<>());
+
+        assertTrue(first.count() > 0);
+        assertTrue(second.count() > first.count()); // includes the stone slabs that existed before
+
+        SchematicReplacer.revertContainer(container, second.oldStates());
+        SchematicReplacer.revertContainer(container, first.oldStates());
+
+        for (int x = 0; x < 5; ++x)
+            for (int y = 0; y < 4; ++y)
+                for (int z = 0; z < 3; ++z)
+                    assertEquals(before[x][y][z], container.get(x, y, z), "at " + x + "," + y + "," + z);
+    }
+
+    @Test
     void noMatchLeavesContainerUntouched()
     {
         LitematicaBlockStateContainer container = new LitematicaBlockStateContainer(1, 1, 1);

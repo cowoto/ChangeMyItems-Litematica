@@ -10,7 +10,7 @@ import java.util.Set;
 
 import javax.annotation.Nullable;
 
-import it.unimi.dsi.fastutil.longs.LongArrayList;
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import it.unimi.dsi.fastutil.objects.Object2ObjectOpenHashMap;
 
 import fi.dy.masa.litematica.schematic.LitematicaSchematic;
@@ -299,7 +299,12 @@ public final class SchematicReplacer
         LitematicaBitArray storage = container.getArray();
         Vec3i size = container.getSize();
         final long volume = (long) size.getX() * size.getY() * size.getZ();
-        Map<BlockState, LongArrayList> changed = new Object2ObjectOpenHashMap<>();
+        Map<BlockState, IntArrayList> changed = new Object2ObjectOpenHashMap<>();
+
+        if (volume > Integer.MAX_VALUE)
+        {
+            throw new IllegalStateException("Region too large for undo indices: " + volume);
+        }
         int count = 0;
         int totalBlocksDelta = 0;
 
@@ -310,7 +315,7 @@ public final class SchematicReplacer
             if (id < paletteSize && newIds[id] >= 0)
             {
                 storage.setAt(index, newIds[id]);
-                changed.computeIfAbsent(oldStates[id], k -> new LongArrayList()).add(index);
+                changed.computeIfAbsent(oldStates[id], k -> new IntArrayList()).add((int) index);
                 ++count;
                 totalBlocksDelta += airDelta(oldStates[id], newStates[id]);
             }
@@ -319,21 +324,21 @@ public final class SchematicReplacer
         return new ContainerChange(count, totalBlocksDelta, changed);
     }
 
-    static void revertContainer(LitematicaBlockStateContainer container, Map<BlockState, LongArrayList> oldStates)
+    static void revertContainer(LitematicaBlockStateContainer container, Map<BlockState, IntArrayList> oldStates)
     {
         Vec3i size = container.getSize();
         final int sizeX = size.getX();
         final int sizeZ = size.getZ();
         final long sizeLayer = (long) sizeX * sizeZ;
 
-        for (Map.Entry<BlockState, LongArrayList> entry : oldStates.entrySet())
+        for (Map.Entry<BlockState, IntArrayList> entry : oldStates.entrySet())
         {
             BlockState state = entry.getKey();
-            LongArrayList indices = entry.getValue();
+            IntArrayList indices = entry.getValue();
 
             for (int i = 0; i < indices.size(); ++i)
             {
-                long index = indices.getLong(i);
+                long index = indices.getInt(i);
                 int y = (int) (index / sizeLayer);
                 int rest = (int) (index % sizeLayer);
                 container.set(rest % sizeX, y, rest / sizeX, state);
@@ -391,7 +396,7 @@ public final class SchematicReplacer
         return BuiltInRegistries.BLOCK.getKey(block).toString();
     }
 
-    record ContainerChange(int count, int totalBlocksDelta, Map<BlockState, LongArrayList> oldStates)
+    record ContainerChange(int count, int totalBlocksDelta, Map<BlockState, IntArrayList> oldStates)
     {
         static final ContainerChange EMPTY = new ContainerChange(0, 0, Map.of());
     }

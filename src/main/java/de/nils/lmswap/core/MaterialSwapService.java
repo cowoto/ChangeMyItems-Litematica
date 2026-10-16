@@ -1,6 +1,7 @@
 package de.nils.lmswap.core;
 
 import java.util.List;
+import java.util.Optional;
 
 import fi.dy.masa.litematica.data.DataManager;
 import fi.dy.masa.litematica.schematic.LitematicaSchematic;
@@ -8,10 +9,11 @@ import fi.dy.masa.litematica.schematic.placement.SchematicPlacement;
 import net.minecraft.client.Minecraft;
 
 import de.nils.lmswap.core.ReplacementResult.Message;
+import de.nils.lmswap.data.ReplacementHistory;
 
 /**
- * Connects {@link SchematicReplacer} with the running Litematica state: applies rules to a loaded schematic and
- * triggers the schematic world rebuild and the material list refresh.
+ * Connects {@link SchematicReplacer} with the running Litematica state: applies rules to a loaded schematic, records
+ * the undo history and triggers the schematic world rebuild and the material list refresh.
  * <p>
  * Placements can share one {@link LitematicaSchematic} instance (see docs/DECISIONS.md), so a replacement always
  * affects every placement of that schematic. Callers should warn the user via {@link #getPlacementsOfSchematic}.
@@ -26,15 +28,15 @@ public final class MaterialSwapService
 
     public static ReplacementResult replaceInPlacement(SchematicPlacement placement, ReplacementRule rule)
     {
-        return replaceInSchematic(placement.getSchematic(), List.of(rule));
+        return replaceInSchematic(placement.getSchematic(), List.of(rule), "?", "?");
     }
 
-    public static ReplacementResult replaceInPlacement(SchematicPlacement placement, List<ReplacementRule> rules)
-    {
-        return replaceInSchematic(placement.getSchematic(), rules);
-    }
-
-    public static ReplacementResult replaceInSchematic(LitematicaSchematic schematic, List<ReplacementRule> rules)
+    /**
+     * @param sourceName display name of the replaced material, for the undo history
+     * @param targetName display name of the new block, for the undo history
+     */
+    public static ReplacementResult replaceInSchematic(LitematicaSchematic schematic, List<ReplacementRule> rules,
+                                                       String sourceName, String targetName)
     {
         if (Minecraft.getInstance().level == null)
         {
@@ -45,10 +47,34 @@ public final class MaterialSwapService
 
         if (result.change() != null)
         {
+            ReplacementHistory.INSTANCE.push(schematic, new ReplacementHistory.Entry(result.change(), sourceName,
+                                                                                     targetName, result.totalReplaced()));
             refreshAfterChange(schematic);
         }
 
         return result;
+    }
+
+    /**
+     * Reverts the most recent replacement of the schematic.
+     *
+     * @return the reverted entry, empty if there was nothing to undo or no world is loaded
+     */
+    public static Optional<ReplacementHistory.Entry> undoLast(LitematicaSchematic schematic)
+    {
+        if (Minecraft.getInstance().level == null)
+        {
+            return Optional.empty();
+        }
+
+        Optional<ReplacementHistory.Entry> entry = ReplacementHistory.INSTANCE.pop(schematic);
+
+        entry.ifPresent(e -> {
+            SchematicReplacer.revert(schematic, e.change());
+            refreshAfterChange(schematic);
+        });
+
+        return entry;
     }
 
     /**
@@ -59,14 +85,6 @@ public final class MaterialSwapService
     {
         DataManager.getSchematicPlacementManager().markAllPlacementsOfSchematicForRebuild(schematic);
         RebuildWatcher.INSTANCE.refreshWhenRebuilt(schematic);
-    }
-
-    /**
-     * All placements that would be affected by a replacement in the schematic of {@code placement}.
-     */
-    public static List<SchematicPlacement> getPlacementsOfSchematic(SchematicPlacement placement)
-    {
-        return getPlacementsOfSchematic(placement.getSchematic());
     }
 
     public static List<SchematicPlacement> getPlacementsOfSchematic(LitematicaSchematic schematic)

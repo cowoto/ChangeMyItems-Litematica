@@ -1,8 +1,8 @@
 {
 	"lmswap.mod.name": "Litematica Material Swap",
 	"lmswap.gui.button.material_list.replace": "Replace",
-	"lmswap.gui.button.material_list.undo": "Undo",
-	"lmswap.gui.button.material_list.save_as": "Save as...",
+	"lmswap.gui.button.material_list.undo": "Undo last replacement",
+	"lmswap.gui.button.material_list.save_as": "Save as new schematic",
 	"lmswap.error.properties_differ": "%s and %s do not have the same block properties, replacement not possible",
 	"lmswap.warning.properties_dropped": "%s: properties not transferred: %s",
 	"lmswap.warning.block_entities_removed": "Removed %s block entity data entries in region '%s' (target has no block entity)",
@@ -28,5 +28,18 @@
 	"lmswap.warning.block_entity_data_lost": "Block entity data (e.g. container contents) will be removed",
 	"lmswap.warning.material_removed": "The material will be removed from the schematic",
 	"lmswap.gui.label.targets_compatible": "%s blocks with the same properties",
-	"lmswap.gui.label.targets_all": "%s blocks (properties are reset)"
+	"lmswap.gui.label.targets_all": "%s blocks (properties are reset)",
+	"lmswap.gui.label.not_saved_notice": "Replacements only last until the schematic is reloaded - use \"Save as new schematic\" in the material list to keep them.",
+	"lmswap.gui.button.material_list.undo.hover": "Undo: %s → %s (%s blocks)",
+	"lmswap.gui.button.material_list.undo.empty": "No replacement to undo",
+	"lmswap.gui.button.material_list.save_as.hover": "Writes the schematic including all replacements to a new .litematic file next to the original.",
+	"lmswap.gui.title.save_as": "Save as new schematic (file name)",
+	"lmswap.gui.title.confirm_overwrite": "Overwrite file?",
+	"lmswap.gui.confirm.overwrite_original": "'%s' is the ORIGINAL file of this schematic. Overwrite it with the replaced version?",
+	"lmswap.gui.confirm.overwrite_existing": "'%s' already exists. Overwrite it?",
+	"lmswap.error.save_name_empty": "Please enter a file name",
+	"lmswap.info.saved": "Saved as %s",
+	"lmswap.info.undone": "Undone: %s blocks %s → %s restored",
+	"lmswap.gui.button.material_list.undo.hover2": "%s replacement(s) in history",
+	"lmswap.gui.button.material_list.save_as.hover2": "The original file is not changed."
 }

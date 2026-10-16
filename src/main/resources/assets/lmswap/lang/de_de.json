@@ -1,8 +1,8 @@
 {
 	"lmswap.mod.name": "Litematica Material Swap",
 	"lmswap.gui.button.material_list.replace": "Ersetzen",
-	"lmswap.gui.button.material_list.undo": "Rückgängig",
-	"lmswap.gui.button.material_list.save_as": "Speichern als...",
+	"lmswap.gui.button.material_list.undo": "Letzte Ersetzung rückgängig",
+	"lmswap.gui.button.material_list.save_as": "Als neue Schematic speichern",
 	"lmswap.error.properties_differ": "%s und %s haben nicht dieselben Block-Eigenschaften, Ersetzen nicht möglich",
 	"lmswap.warning.properties_dropped": "%s: Eigenschaften nicht übernommen: %s",
 	"lmswap.warning.block_entities_removed": "%s Block-Entity-Daten in Region '%s' entfernt (Zielblock hat keine Block-Entity)",
@@ -28,5 +28,18 @@
 	"lmswap.warning.block_entity_data_lost": "Block-Entity-Daten (z. B. Inhalte von Behältern) werden entfernt",
 	"lmswap.warning.material_removed": "Das Material wird aus der Schematic entfernt",
 	"lmswap.gui.label.targets_compatible": "%s Blöcke mit gleichen Properties",
-	"lmswap.gui.label.targets_all": "%s Blöcke (Properties werden zurückgesetzt)"
+	"lmswap.gui.label.targets_all": "%s Blöcke (Properties werden zurückgesetzt)",
+	"lmswap.gui.label.not_saved_notice": "Ersetzungen gelten nur bis zum Neuladen der Schematic – zum Behalten in der Material List \"Als neue Schematic speichern\".",
+	"lmswap.gui.button.material_list.undo.hover": "Rückgängig: %s → %s (%s Blöcke)",
+	"lmswap.gui.button.material_list.undo.empty": "Keine Ersetzung zum Rückgängigmachen",
+	"lmswap.gui.button.material_list.save_as.hover": "Schreibt die Schematic mit allen Ersetzungen als neue .litematic neben das Original.",
+	"lmswap.gui.title.save_as": "Als neue Schematic speichern (Dateiname)",
+	"lmswap.gui.title.confirm_overwrite": "Datei überschreiben?",
+	"lmswap.gui.confirm.overwrite_original": "'%s' ist die ORIGINALDATEI dieser Schematic. Wirklich mit der ersetzten Version überschreiben?",
+	"lmswap.gui.confirm.overwrite_existing": "'%s' existiert bereits. Überschreiben?",
+	"lmswap.error.save_name_empty": "Bitte einen Dateinamen eingeben",
+	"lmswap.info.saved": "Gespeichert als %s",
+	"lmswap.info.undone": "Rückgängig: %s Blöcke %s → %s wiederhergestellt",
+	"lmswap.gui.button.material_list.undo.hover2": "%s Ersetzung(en) in der Historie",
+	"lmswap.gui.button.material_list.save_as.hover2": "Die Originaldatei bleibt unverändert."
 }

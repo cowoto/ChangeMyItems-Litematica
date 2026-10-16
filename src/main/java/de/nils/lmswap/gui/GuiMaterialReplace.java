@@ -153,6 +153,11 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         ButtonGeneric replace = new ButtonGeneric(cancel.getX() - 4, buttonY, -1, true, "lmswap.gui.button.replace_confirm");
         replace.setEnabled(this.selected != null && this.plan.getBlockCount() > 0);
         this.addButton(replace, (button, mouseButton) -> this.replace());
+
+        // Decision 4: replacements live only in memory until saved as a new schematic
+        String notice = StringUtils.translate("lmswap.gui.label.not_saved_notice");
+        int noticeWidth = Math.min(this.getStringWidth(notice), replace.getX() - 20);
+        this.addLabel(12, buttonY + 6, noticeWidth, 10, 0xFFE0C060, notice);
     }
 
     @Override
@@ -220,7 +225,9 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         }
 
         ReplacementResult result = MaterialSwapService.replaceInSchematic(this.context.schematic(),
-                                                                          this.plan.rulesFor(this.selected, this.keepProperties));
+                                                                          this.plan.rulesFor(this.selected, this.keepProperties),
+                                                                          this.entry.getStack().getHoverName().getString(),
+                                                                          WidgetReplaceTargetEntry.displayName(this.selected));
         Screen parent = this.getParent();
 
         if (result.isSuccess() && result.change() != null)
