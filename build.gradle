@@ -26,11 +26,24 @@ dependencies {
 	minecraft "com.mojang:minecraft:${project.minecraft_version}"
 	implementation "net.fabricmc:fabric-loader:${project.fabric_loader_version}"
 	implementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+	// @Nullable/@Nonnull as used by Litematica/MaLiLib
+	compileOnly "com.google.code.findbugs:jsr305:3.0.2"
 
 	// On the classpath for compiling and runClient, never bundled (no include()).
 	// Non-remapping Loom has no modImplementation; implementation is the equivalent.
 	implementation "fi.dy.masa.malilib:malilib-fabric-${project.minecraft_version}:${project.malilib_version}"
 	implementation "fi.dy.masa.litematica:litematica-fabric-${project.minecraft_version}:${project.litematica_version}"
+
+	// Runs JUnit tests inside Fabric Loader (Knot), so Minecraft classes can be bootstrapped
+	testImplementation "net.fabricmc:fabric-loader-junit:${project.fabric_loader_version}"
+}
+
+test {
+	useJUnitPlatform()
+	testLogging {
+		events 'passed', 'skipped', 'failed'
+		exceptionFormat 'full'
+	}
 }
 
 processResources {

@@ -2,5 +2,9 @@
 	"lmswap.mod.name": "Litematica Material Swap",
 	"lmswap.gui.button.material_list.replace": "Replace",
 	"lmswap.gui.button.material_list.undo": "Undo",
-	"lmswap.gui.button.material_list.save_as": "Save as..."
+	"lmswap.gui.button.material_list.save_as": "Save as...",
+	"lmswap.error.properties_differ": "%s and %s do not have the same block properties, replacement not possible",
+	"lmswap.warning.properties_dropped": "%s: properties not transferred: %s",
+	"lmswap.warning.block_entities_removed": "Removed %s block entity data entries in region '%s' (target has no block entity)",
+	"lmswap.warning.block_entities_kept": "Kept %s block entity data entries in region '%s' (data may not fit the new block)"
 }
