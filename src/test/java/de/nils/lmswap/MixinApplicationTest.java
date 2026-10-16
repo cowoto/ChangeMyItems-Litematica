@@ -48,6 +48,13 @@ class MixinApplicationTest
         assertTrue(hasHandler("fi.dy.masa.litematica.schematic.LitematicaSchematic", "lmswap$clearHistoryOnReload"));
     }
 
+    @Test
+    void autoApplyLoadHooksAreApplied() throws ClassNotFoundException
+    {
+        assertTrue(hasHandler("fi.dy.masa.litematica.schematic.LitematicaSchematic", "lmswap$queueAutoApplyOnReload"));
+        assertTrue(hasHandler("fi.dy.masa.litematica.schematic.LitematicaSchematic", "lmswap$queueAutoApplyOnLoad"));
+    }
+
     private static boolean hasHandler(String className, String handler) throws ClassNotFoundException
     {
         return Arrays.stream(load(className).getDeclaredMethods()).anyMatch(m -> m.getName().contains(handler));

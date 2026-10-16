@@ -10,6 +10,7 @@ import fi.dy.masa.litematica.gui.Icons;
 import fi.dy.masa.litematica.materials.MaterialListEntry;
 import fi.dy.masa.malilib.gui.GuiBase;
 import fi.dy.masa.malilib.gui.GuiListBase;
+import fi.dy.masa.malilib.gui.LeftRight;
 import fi.dy.masa.malilib.gui.Message.MessageType;
 import fi.dy.masa.malilib.gui.button.ButtonGeneric;
 import fi.dy.masa.malilib.gui.interfaces.ISelectionListener;
@@ -23,9 +24,12 @@ import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 
+import de.nils.lmswap.config.Configs;
 import de.nils.lmswap.core.ItemReplacementPlan;
 import de.nils.lmswap.core.MaterialSwapService;
 import de.nils.lmswap.core.ReplacementResult;
+import de.nils.lmswap.data.RuleStore;
+import de.nils.lmswap.data.SavedRule;
 
 /**
  * "Replace material" screen, opened from a material list row.
@@ -35,7 +39,9 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
                                 implements ISelectionListener<Block>
 {
     private static final int LIST_Y = 50;
-    private static final int BOTTOM_AREA_HEIGHT = 96;
+    private static final int BOTTOM_AREA_HEIGHT = 110;
+    private static final int RULES_PANEL_WIDTH = 230;
+    private static final int RULE_ROW_HEIGHT = 14;
 
     private final ReplaceContext context;
     private final MaterialListEntry entry;
@@ -43,6 +49,8 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
     private final List<Block> targets = new ArrayList<>();
     private final int placementCount;
     private boolean keepProperties = true;
+    private boolean rememberForSchematic;
+    private boolean rememberGlobal;
     @Nullable private Block selected;
 
     public GuiMaterialReplace(ReplaceContext context, MaterialListEntry entry)
@@ -105,7 +113,7 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
     @Override
     protected int getBrowserWidth()
     {
-        return this.getScreenWidth() - 20;
+        return this.getScreenWidth() - 20 - RULES_PANEL_WIDTH - 8;
     }
 
     @Override
@@ -146,6 +154,29 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
                                             this.targets.size() - 1);
         this.addLabel(checkBox.getX() + checkBox.getWidth() + 12, y + 1, this.getStringWidth(hint), 10, 0xFFA0A0A0, hint);
 
+        y += 14;
+        int x = 12;
+
+        if (RuleStore.INSTANCE.canStoreFor(this.context.schematic()))
+        {
+            WidgetCheckBox rememberSchematic = new WidgetCheckBox(x, y, Icons.CHECKBOX_UNSELECTED, Icons.CHECKBOX_SELECTED,
+                                                                  StringUtils.translate("lmswap.gui.checkbox.remember_schematic"),
+                                                                  StringUtils.translate("lmswap.gui.checkbox.remember_schematic.hover"));
+            rememberSchematic.setChecked(this.rememberForSchematic, false);
+            rememberSchematic.setListener(cb -> this.rememberForSchematic = cb.isChecked());
+            this.addWidget(rememberSchematic);
+            x += rememberSchematic.getWidth() + 16;
+        }
+
+        WidgetCheckBox rememberGlobal = new WidgetCheckBox(x, y, Icons.CHECKBOX_UNSELECTED, Icons.CHECKBOX_SELECTED,
+                                                           StringUtils.translate("lmswap.gui.checkbox.remember_global"),
+                                                           StringUtils.translate("lmswap.gui.checkbox.remember_global.hover"));
+        rememberGlobal.setChecked(this.rememberGlobal, false);
+        rememberGlobal.setListener(cb -> this.rememberGlobal = cb.isChecked());
+        this.addWidget(rememberGlobal);
+
+        this.createRulesPanel();
+
         int buttonY = this.getScreenHeight() - 26;
         ButtonGeneric cancel = new ButtonGeneric(this.getScreenWidth() - 10, buttonY, -1, true, "lmswap.gui.button.cancel");
         this.addButton(cancel, (button, mouseButton) -> this.closeGui(true));
@@ -158,6 +189,94 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         String notice = StringUtils.translate("lmswap.gui.label.not_saved_notice");
         int noticeWidth = Math.min(this.getStringWidth(notice), replace.getX() - 20);
         this.addLabel(12, buttonY + 6, noticeWidth, 10, 0xFFE0C060, notice);
+    }
+
+    /**
+     * Saved rules of this schematic and the global rules, each with a delete button.
+     */
+    private void createRulesPanel()
+    {
+        int panelX = 10 + this.getBrowserWidth() + 8;
+        int y = LIST_Y + 4;
+        int width = RULES_PANEL_WIDTH;
+        int maxY = LIST_Y + this.getBrowserHeight() - RULE_ROW_HEIGHT;
+
+        String title = StringUtils.translate("lmswap.gui.label.rules_title");
+        this.addLabel(panelX, y, width, 10, 0xFFFFFFFF, GuiBase.TXT_BOLD + title);
+        y += 12;
+
+        String status = StringUtils.translate(Configs.AUTO_APPLY_RULES.getBooleanValue() ? "lmswap.gui.label.rules_auto_on"
+                                                                                          : "lmswap.gui.label.rules_auto_off");
+        this.addLabel(panelX, y, width, 10, 0xFFA0A0A0, StringUtils.clampTextToRenderLength(status, width, LeftRight.RIGHT, "..."));
+        y += 14;
+
+        List<SavedRule> schematicRules = RuleStore.INSTANCE.getSchematicRules(this.context.schematic());
+        List<SavedRule> globalRules = RuleStore.INSTANCE.getGlobalRules();
+        int total = schematicRules.size() + globalRules.size();
+        int shown = 0;
+
+        if (total == 0)
+        {
+            this.addLabel(panelX, y, width, 10, 0xFFA0A0A0, StringUtils.translate("lmswap.gui.label.rules_none"));
+            return;
+        }
+
+        for (int i = 0; i < total && y <= maxY; ++i, ++shown)
+        {
+            boolean global = i >= schematicRules.size();
+            SavedRule rule = global ? globalRules.get(i - schematicRules.size()) : schematicRules.get(i);
+
+            ButtonGeneric delete = new ButtonGeneric(panelX, y - 2, 14, 12, "x",
+                                                     StringUtils.translate("lmswap.gui.button.rule_delete.hover"));
+            this.addButton(delete, (button, mouseButton) -> this.deleteRule(rule, global));
+
+            String prefix = global ? GuiBase.TXT_GOLD + StringUtils.translate("lmswap.gui.label.rule_global") + " " + GuiBase.TXT_RST : "";
+            String suffix = rule.keepProperties() ? "" : " " + StringUtils.translate("lmswap.gui.label.rule_reset");
+            String text = prefix + rule.sourceName() + " → " + rule.targetName() + suffix;
+            this.addLabel(panelX + 18, y, width - 18, 10, 0xFFFFFFFF,
+                          StringUtils.clampTextToRenderLength(text, width - 18, LeftRight.RIGHT, "..."));
+            y += RULE_ROW_HEIGHT;
+        }
+
+        if (shown < total)
+        {
+            this.addLabel(panelX + 18, y, width - 18, 10, 0xFFA0A0A0,
+                          StringUtils.translate("lmswap.gui.label.rules_more", total - shown));
+        }
+    }
+
+    private void deleteRule(SavedRule rule, boolean global)
+    {
+        if (global)
+        {
+            RuleStore.INSTANCE.removeGlobal(rule);
+        }
+        else
+        {
+            RuleStore.INSTANCE.removeForSchematic(this.context.schematic(), rule);
+        }
+
+        this.initGui();
+    }
+
+    private void rememberRule()
+    {
+        if (this.selected == null || (this.rememberForSchematic == false && this.rememberGlobal == false))
+        {
+            return;
+        }
+
+        SavedRule rule = SavedRule.of(this.entry.getStack().getItem(), this.selected, this.keepProperties);
+
+        if (this.rememberForSchematic)
+        {
+            RuleStore.INSTANCE.putForSchematic(this.context.schematic(), rule);
+        }
+
+        if (this.rememberGlobal)
+        {
+            RuleStore.INSTANCE.putGlobal(rule);
+        }
     }
 
     @Override
@@ -190,7 +309,7 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
     private void drawPreview(GuiContext ctx)
     {
         int x = 12;
-        int y = LIST_Y + this.getBrowserHeight() + 20;
+        int y = LIST_Y + this.getBrowserHeight() + 34;
 
         if (this.plan.getBlockCount() == 0)
         {
@@ -233,6 +352,11 @@ public class GuiMaterialReplace extends GuiListBase<Block, WidgetReplaceTargetEn
         if (result.isSuccess() && result.change() != null)
         {
             this.context.refreshMaterialList();
+        }
+
+        if (result.isSuccess())
+        {
+            this.rememberRule();
         }
 
         if (parent instanceof GuiBase gui)

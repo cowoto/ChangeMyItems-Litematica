@@ -39,6 +39,12 @@ MaLiLib und Litematica werden nicht mit eingebündelt und müssen separat instal
 
 Startet Minecraft mit Fabric API, MaLiLib, Litematica und diesem Mod.
 
+## Konfiguration
+
+- Config-Seite: Hotkey **M,W**, über MaLiLibs Config-Umschalter oder Mod Menu.
+- `config/lmswap.json` – Optionen (z. B. „Gespeicherte Regeln beim Laden anwenden“, Standard aus).
+- `config/lmswap_rules.json` – gespeicherte Ersetzungsregeln (global und pro Schematic-Datei).
+
 ## Dokumentation
 
 - [docs/RESEARCH.md](docs/RESEARCH.md) – Versionen, Litematica-Klassen, Einbindung

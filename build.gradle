@@ -15,6 +15,11 @@ repositories {
 		url = 'https://masa.dy.fi/maven/sakura-ryoko'
 		content { includeGroupAndSubgroups('fi.dy.masa') }
 	}
+	// Mod Menu API (optional integration, compile only)
+	maven {
+		url = 'https://maven.terraformersmc.com/releases/'
+		content { includeGroupAndSubgroups('com.terraformersmc') }
+	}
 	// Runtime dependency of Litematica/MaLiLib (conditional-mixin)
 	maven {
 		url = 'https://maven.fallenbreath.me/releases'
@@ -33,6 +38,9 @@ dependencies {
 	// Non-remapping Loom has no modImplementation; implementation is the equivalent.
 	implementation "fi.dy.masa.malilib:malilib-fabric-${project.minecraft_version}:${project.malilib_version}"
 	implementation "fi.dy.masa.litematica:litematica-fabric-${project.minecraft_version}:${project.litematica_version}"
+
+	// Optional: config screen entry in Mod Menu, not required at runtime
+	compileOnly "com.terraformersmc:modmenu:${project.mod_menu_version}"
 
 	// Runs JUnit tests inside Fabric Loader (Knot), so Minecraft classes can be bootstrapped
 	testImplementation "net.fabricmc:fabric-loader-junit:${project.fabric_loader_version}"

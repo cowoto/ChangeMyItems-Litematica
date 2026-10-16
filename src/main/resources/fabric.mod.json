@@ -12,6 +12,9 @@
 	"entrypoints": {
 		"client": [
 			"de.nils.lmswap.LmSwapClient"
+		],
+		"modmenu": [
+			"de.nils.lmswap.compat.ModMenuImpl"
 		]
 	},
 	"mixins": [
