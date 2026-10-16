@@ -30,3 +30,8 @@ hs_err_*.log
 
 # Minecraft logs written by the unit tests (fabric-loader-junit runs in the project directory)
 logs/
+
+# Private project notes, kept locally only
+Claude.md
+CLAUDE.md
+docs/

@@ -6,9 +6,6 @@ Teilbereich oder als Batch. Hologramm, Verifier und Easy Place arbeiten danach m
 
 > Version 0.1.0 – siehe [CHANGELOG.md](CHANGELOG.md).
 
-![Übersicht](docs/screenshots/overview.png)
-<!-- TODO Screenshot: Material List mit den Buttons „Ersetzen“, „Batch-Ersetzung“, „Rückgängig“, „Als neue Schematic speichern“ -->
-
 ## Funktionen
 
 - **Ersetzen aus der Material List** – Button „Ersetzen“ in jeder Zeile, Zielblock aus einer durchsuchbaren Liste.
@@ -56,8 +53,6 @@ Version. Der Mod läuft nur auf dem Client; auf Servern muss nichts installiert 
    - als Regel für diese Schematic oder global merken.
 5. Vorschau prüfen („N Blöcke werden ersetzt“ + Warnungen) → **Ersetzen**.
 
-![Material ersetzen](docs/screenshots/replace.png)
-<!-- TODO Screenshot: Ersetzen-Screen mit gewähltem Ziel, aufgeklapptem Filter und Bereichs-Umschalter -->
 
 ### Batch-Ersetzung
 
@@ -70,8 +65,6 @@ Version. Der Mod läuft nur auf dem Client; auf Servern muss nichts installiert 
 5. Vorschau unten: Treffer je Regel, Warnungen (Ketten, überlappende Filter), Änderung der Material List →
    **Ausführen**.
 
-![Batch-Ersetzung](docs/screenshots/batch.png)
-<!-- TODO Screenshot: Batch-Screen mit drei Regeln, Vorschau und Kettenwarnung -->
 
 ### Rückgängig und Speichern
 
@@ -81,8 +74,6 @@ Version. Der Mod läuft nur auf dem Client; auf Servern muss nichts installiert 
   ausdrücklicher Bestätigung überschrieben.
 - Ohne Speichern gelten Ersetzungen nur bis zum Neuladen der Schematic.
 
-![Rückgängig und Speichern](docs/screenshots/undo-save.png)
-<!-- TODO Screenshot: Material List nach einer Ersetzung, Tooltip von „Letzte Ersetzung rückgängig“ -->
 
 ### Konfiguration
 
@@ -115,7 +106,7 @@ automatisch migriert, Sicherung `lmswap_rules.v1.bak.json`).
 - **Regeln sind an den Dateipfad gebunden** – nach Umbenennen/Verschieben gelten nur noch globale Regeln.
 - **Batch:** höchstens 63 Regeln; kein Drag & Drop (Pfeile bzw. Shift+↑/↓). Sehr große Batches (Millionen Blöcke)
   verursachen einen kurzen Hänger.
-- Getestet im Dev-Client; siehe [docs/TESTS.md](docs/TESTS.md) für den Stand der manuellen Prüfungen.
+- Version 0.1.0 ist im Dev-Client entwickelt und per Unit-Tests geprüft; Rückmeldungen über die Issues sind willkommen.
 
 ## Lizenz
 
@@ -138,7 +129,3 @@ Voraussetzung: JDK 25. Gradle findet es über die Toolchain; sonst in `~/.gradle
 
 Jeder Push baut über GitHub Actions ([.github/workflows/build.yml](.github/workflows/build.yml)); die JAR liegt als
 Artefakt am Workflow-Lauf.
-
-Dokumentation: [docs/RESEARCH.md](docs/RESEARCH.md) (Versionen, Litematica-Klassen),
-[docs/DECISIONS.md](docs/DECISIONS.md) (Entscheidungen), [docs/TESTS.md](docs/TESTS.md) (Testfälle),
-[docs/ROADMAP.md](docs/ROADMAP.md) (Ideen für 0.2).
