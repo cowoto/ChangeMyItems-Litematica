@@ -27,3 +27,6 @@ Thumbs.db
 # Java
 *.log
 hs_err_*.log
+
+# Minecraft logs written by the unit tests (fabric-loader-junit runs in the project directory)
+logs/
